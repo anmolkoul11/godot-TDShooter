@@ -49,7 +49,7 @@ _data = {
 }
 
 [node name="Enemy" type="CharacterBody2D"]
-collision_layer = 8
+collision_layer = 4
 collision_mask = 9
 motion_mode = 1
 wall_min_slide_angle = 0.0
