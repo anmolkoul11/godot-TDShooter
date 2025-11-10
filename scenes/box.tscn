@@ -17,3 +17,7 @@ texture_filter = 1
 position = Vector2(-56.499992, -31)
 scale = Vector2(0.9902344, 1)
 texture = ExtResource("1_3inec")
+
+[node name="NavigationObstacle2D" type="NavigationObstacle2D" parent="."]
+radius = 10.0
+vertices = PackedVector2Array(-317, -294, -317, 234, 201, 234, 201, -294)

@@ -1,4 +1,4 @@
-[gd_scene load_steps=6 format=3 uid="uid://c26ytx1m2b0sm"]
+[gd_scene load_steps=7 format=3 uid="uid://c26ytx1m2b0sm"]
 
 [ext_resource type="PackedScene" uid="uid://bid5n228xcinl" path="res://scenes/box.tscn" id="1_jedrf"]
 [ext_resource type="Script" uid="uid://baewtts3ylpa0" path="res://scripts/world_scene.gd" id="1_ow06g"]
@@ -6,6 +6,13 @@
 [ext_resource type="PackedScene" uid="uid://buyxeqalv2e42" path="res://scenes/enemy.tscn" id="3_qiqor"]
 
 [sub_resource type="QuadMesh" id="QuadMesh_e8udx"]
+
+[sub_resource type="NavigationPolygon" id="NavigationPolygon_ow06g"]
+vertices = PackedVector2Array(188.5625, 2539.2578, 1770.2031, 1957.6016, 2781.7969, 1778.6016, 2997.2031, 1778.6016, 4065.2422, 2544.1328, 2164.2031, 1018.2031, 1948.7969, 1018.2031, 1214.2031, 846.60156, 1214.2031, 631.2031, 2179.7969, 297.60156, 2395.2031, 297.60156, 2997.2031, 1563.2031, 2781.7969, 1563.2031, 2164.2031, 1233.6016, 4067.1484, -0.21875, 1554.7969, 1957.6016, 1554.7969, 1742.2031, 178.03125, -2.171875, 998.7969, 846.60156, 2395.2031, 82.203125, 2179.7969, 82.203125, 1770.2031, 1742.2031, 1948.7969, 1233.6016, 998.7969, 631.2031)
+polygons = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3, 4), PackedInt32Array(5, 6, 7, 8, 9, 10), PackedInt32Array(11, 12, 13, 5, 10, 14), PackedInt32Array(15, 1, 0), PackedInt32Array(14, 4, 3, 11), PackedInt32Array(16, 15, 0, 17, 18), PackedInt32Array(14, 10, 19), PackedInt32Array(17, 14, 19, 20), PackedInt32Array(13, 12, 2, 1, 21, 22), PackedInt32Array(17, 20, 9, 8, 23), PackedInt32Array(7, 6, 22, 21, 16, 18), PackedInt32Array(17, 23, 18)])
+outlines = Array[PackedVector2Array]([PackedVector2Array(122, -58, 4123, -56, 4121, 2600, 133, 2595)])
+parsed_geometry_type = 1
+agent_radius = 55.8
 
 [node name="WorldMap" type="Node2D"]
 script = ExtResource("1_ow06g")
@@ -16,26 +23,6 @@ position = Vector2(1129, 764)
 scale = Vector2(4021.25, 2683.5)
 mesh = SubResource("QuadMesh_e8udx")
 metadata/_edit_lock_ = true
-
-[node name="Box" parent="." instance=ExtResource("1_jedrf")]
-position = Vector2(161, 226.00003)
-scale = Vector2(0.2, 0.2)
-
-[node name="Box2" parent="." instance=ExtResource("1_jedrf")]
-position = Vector2(1944, 1158)
-scale = Vector2(0.2, 0.2)
-
-[node name="Box3" parent="." instance=ExtResource("1_jedrf")]
-position = Vector2(717.0001, 1337)
-scale = Vector2(0.2, 0.2)
-
-[node name="Box4" parent="." instance=ExtResource("1_jedrf")]
-position = Vector2(1111, 613.00006)
-scale = Vector2(0.2, 0.2)
-
-[node name="Box5" parent="." instance=ExtResource("1_jedrf")]
-position = Vector2(1342, -323)
-scale = Vector2(0.2, 0.2)
 
 [node name="Player" parent="." instance=ExtResource("2_kjcoe")]
 position = Vector2(397, 357)
@@ -54,3 +41,29 @@ position = Vector2(2059, 1275)
 scale = Vector2(0.5, 0.5)
 
 [node name="MainCamera" type="Camera2D" parent="."]
+
+[node name="NavigationRegion2D" type="NavigationRegion2D" parent="."]
+position = Vector2(-999, -511)
+navigation_polygon = SubResource("NavigationPolygon_ow06g")
+navigation_layers = 7
+metadata/_edit_group_ = true
+
+[node name="Box5" parent="NavigationRegion2D" instance=ExtResource("1_jedrf")]
+position = Vector2(2299, 196)
+scale = Vector2(0.2, 0.2)
+
+[node name="Box4" parent="NavigationRegion2D" instance=ExtResource("1_jedrf")]
+position = Vector2(2068, 1132)
+scale = Vector2(0.19999999, 0.19999999)
+
+[node name="Box3" parent="NavigationRegion2D" instance=ExtResource("1_jedrf")]
+position = Vector2(1674.0001, 1856)
+scale = Vector2(0.2, 0.2)
+
+[node name="Box2" parent="NavigationRegion2D" instance=ExtResource("1_jedrf")]
+position = Vector2(2901, 1677)
+scale = Vector2(0.2, 0.2)
+
+[node name="Box" parent="NavigationRegion2D" instance=ExtResource("1_jedrf")]
+position = Vector2(1118, 745)
+scale = Vector2(0.2, 0.2)

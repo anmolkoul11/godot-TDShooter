@@ -51,6 +51,8 @@ _data = {
 [node name="Enemy" type="CharacterBody2D"]
 collision_layer = 8
 collision_mask = 9
+motion_mode = 1
+wall_min_slide_angle = 0.0
 script = ExtResource("1_md0e3")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
@@ -78,6 +80,12 @@ libraries = {
 
 [node name="HurtSound" type="AudioStreamPlayer2D" parent="."]
 stream = ExtResource("3_4ra3w")
+
+[node name="NavigationAgent2D" type="NavigationAgent2D" parent="."]
+
+[node name="Timer" type="Timer" parent="."]
+wait_time = 0.3
+autostart = true
 
 [connection signal="body_entered" from="PlayerDetection" to="." method="_on_player_detection_body_entered"]
 [connection signal="body_exited" from="PlayerDetection" to="." method="_on_player_detection_body_exited"]
