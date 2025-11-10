@@ -1,0 +1,19 @@
+[gd_scene load_steps=3 format=3 uid="uid://bid5n228xcinl"]
+
+[ext_resource type="Texture2D" uid="uid://btg8vnycq5clp" path="res://assets/RTS_Crate.png" id="1_3inec"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_3inec"]
+size = Vector2(519, 519)
+
+[node name="Box" type="StaticBody2D"]
+collision_mask = 10
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(-57.5, -30.5)
+shape = SubResource("RectangleShape2D_3inec")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture_filter = 1
+position = Vector2(-56.499992, -31)
+scale = Vector2(0.9902344, 1)
+texture = ExtResource("1_3inec")

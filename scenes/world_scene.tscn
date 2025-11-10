@@ -1,0 +1,56 @@
+[gd_scene load_steps=6 format=3 uid="uid://c26ytx1m2b0sm"]
+
+[ext_resource type="PackedScene" uid="uid://bid5n228xcinl" path="res://scenes/box.tscn" id="1_jedrf"]
+[ext_resource type="Script" uid="uid://baewtts3ylpa0" path="res://scripts/world_scene.gd" id="1_ow06g"]
+[ext_resource type="PackedScene" uid="uid://bxhkm41gc4gl6" path="res://scenes/player.tscn" id="2_kjcoe"]
+[ext_resource type="PackedScene" uid="uid://buyxeqalv2e42" path="res://scenes/enemy.tscn" id="3_qiqor"]
+
+[sub_resource type="QuadMesh" id="QuadMesh_e8udx"]
+
+[node name="WorldMap" type="Node2D"]
+script = ExtResource("1_ow06g")
+
+[node name="MeshInstance2D" type="MeshInstance2D" parent="."]
+modulate = Color(0, 0.26028818, 0, 1)
+position = Vector2(1129, 764)
+scale = Vector2(4021.25, 2683.5)
+mesh = SubResource("QuadMesh_e8udx")
+metadata/_edit_lock_ = true
+
+[node name="Box" parent="." instance=ExtResource("1_jedrf")]
+position = Vector2(161, 226.00003)
+scale = Vector2(0.2, 0.2)
+
+[node name="Box2" parent="." instance=ExtResource("1_jedrf")]
+position = Vector2(1944, 1158)
+scale = Vector2(0.2, 0.2)
+
+[node name="Box3" parent="." instance=ExtResource("1_jedrf")]
+position = Vector2(717.0001, 1337)
+scale = Vector2(0.2, 0.2)
+
+[node name="Box4" parent="." instance=ExtResource("1_jedrf")]
+position = Vector2(1111, 613.00006)
+scale = Vector2(0.2, 0.2)
+
+[node name="Box5" parent="." instance=ExtResource("1_jedrf")]
+position = Vector2(1342, -323)
+scale = Vector2(0.2, 0.2)
+
+[node name="Player" parent="." instance=ExtResource("2_kjcoe")]
+position = Vector2(397, 357)
+scale = Vector2(0.5, 0.5)
+
+[node name="Enemy" parent="." instance=ExtResource("3_qiqor")]
+position = Vector2(1007, 111)
+scale = Vector2(0.5, 0.5)
+
+[node name="Enemy2" parent="." instance=ExtResource("3_qiqor")]
+position = Vector2(-433, 1206)
+scale = Vector2(0.5, 0.5)
+
+[node name="Enemy3" parent="." instance=ExtResource("3_qiqor")]
+position = Vector2(2059, 1275)
+scale = Vector2(0.5, 0.5)
+
+[node name="MainCamera" type="Camera2D" parent="."]

@@ -1,0 +1,83 @@
+[gd_scene load_steps=9 format=3 uid="uid://buyxeqalv2e42"]
+
+[ext_resource type="Script" uid="uid://dhjodku54cs8b" path="res://scripts/enemy.gd" id="1_md0e3"]
+[ext_resource type="Texture2D" uid="uid://c5k6twbdchq0c" path="res://assets/enemy.png" id="2_4ra3w"]
+[ext_resource type="AudioStream" uid="uid://b0unxyv1j12n4" path="res://sfx/slap-hurt-pain-sound-effect-262618.mp3" id="3_4ra3w"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_7p1mj"]
+radius = 83.0
+height = 202.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_7p1mj"]
+radius = 791.0765
+
+[sub_resource type="Animation" id="Animation_4ra3w"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Sprite2D:modulate")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Color(1, 1, 1, 1)]
+}
+
+[sub_resource type="Animation" id="Animation_md0e3"]
+resource_name = "take_damage"
+length = 0.3
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Sprite2D:modulate")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.26666668),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Color(1, 0, 0, 1), Color(1, 1, 1, 1)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_5uy6h"]
+_data = {
+&"RESET": SubResource("Animation_4ra3w"),
+&"take_damage": SubResource("Animation_md0e3")
+}
+
+[node name="Enemy" type="CharacterBody2D"]
+collision_layer = 8
+collision_mask = 9
+script = ExtResource("1_md0e3")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+modulate = Color(0.8901961, 0, 0, 1)
+position = Vector2(75, 72)
+shape = SubResource("CapsuleShape2D_7p1mj")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+position = Vector2(118, 59)
+texture = ExtResource("2_4ra3w")
+
+[node name="PlayerDetection" type="Area2D" parent="."]
+collision_layer = 32
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="PlayerDetection"]
+visible = false
+position = Vector2(381, 77)
+shape = SubResource("CircleShape2D_7p1mj")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+libraries = {
+&"": SubResource("AnimationLibrary_5uy6h")
+}
+
+[node name="HurtSound" type="AudioStreamPlayer2D" parent="."]
+stream = ExtResource("3_4ra3w")
+
+[connection signal="body_entered" from="PlayerDetection" to="." method="_on_player_detection_body_entered"]
+[connection signal="body_exited" from="PlayerDetection" to="." method="_on_player_detection_body_exited"]
