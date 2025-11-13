@@ -20,6 +20,8 @@ const MUZZLE_SCENE  := preload("res://scenes/muzzle_flash.tscn") # ok if missing
 const TRACER_SCENE  := preload("res://scenes/tracer.tscn")
 
 @export var shoot_cooldown: float = 0.12
+@export var tracer_speed_px_per_sec: float = 9000.0  # visual tracer speed
+@export var tracer_fade_time: float = 0.06           # fade after reaching target
 var _cooldown_left: float = 0.0
 
 @onready var camera_remote_transform: RemoteTransform2D = $CamRemoteTransform
@@ -78,6 +80,9 @@ func _fire_bullet() -> void:
 
 		var tracer: Tracer = TRACER_SCENE.instantiate()
 		scene_root.add_child(tracer)
+		# Configure tracer to travel at a consistent speed and then fade
+		tracer.speed_px_per_sec = tracer_speed_px_per_sec
+		tracer.fade_time = tracer_fade_time
 		tracer.fire(start, end_point)
 	# === END TRACER ===
 
@@ -95,10 +100,11 @@ func _fire_bullet() -> void:
 	if shoot_sound:
 		shoot_sound.play()
 
-# func _on_hitbox_body_entered(body: Node2D) -> void:
-# 	if body is Enemy:
-# 		died.emit()
-# 		queue_free()
+func _on_hitbox_body_entered(body: Node2D) -> void:
+	# If any enemy body touches the player's hitbox, the player dies immediately
+	if body is Enemy:
+		died.emit()
+		queue_free()
 
 func _handle_regen(delta: float) -> void:
 	# Already full, nothing to do

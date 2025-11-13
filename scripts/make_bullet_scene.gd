@@ -33,8 +33,13 @@ func _run() -> void:
 		push_error("Couldn't find res://scripts/bullet.gd — make sure it exists.")
 
 	scene.pack(root)
-	var err := ResourceSaver.save("res://scenes/bullet.tscn", scene)
+	var target_path := "res://scenes/bullet.tscn"
+	if ResourceLoader.exists(target_path):
+		push_warning("Bullet scene already exists at %s — skipping save. Delete it if you want to regenerate." % target_path)
+		return
+
+	var err := ResourceSaver.save(scene, target_path)
 	if err == OK:
-		print("Saved bullet scene: res://scenes/bullet.tscn")
+		print("Saved bullet scene: %s" % target_path)
 	else:
 		push_error("Failed to save bullet scene, code: %s" % err)

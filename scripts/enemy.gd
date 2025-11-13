@@ -9,6 +9,8 @@ const TRACER_SCENE  := preload("res://scenes/tracer.tscn")
 @export var stop_distance: float = 40.0
 @export var show_path: bool = true
 @export var hit_points: int = 3
+@export var tracer_speed_px_per_sec: float = 7500.0  # enemy tracer slightly slower than player
+@export var tracer_fade_time: float = 0.06           # fade after reaching target
 
 # Shooting parameters
 @export var shoot_distance: float = 900.0               # Max distance at which the enemy will shoot
@@ -180,9 +182,20 @@ func _shoot_at_player() -> void:
 
 	# === TRACER (uses the same Tracer scene as player) ===
 	if TRACER_SCENE:
-		var end_point := start + dir * 700.0
+		# Raycast to actual hit point so tracer length matches reality
+		var max_range := 1200.0
+		var to := start + dir * max_range
+		var space_state := get_world_2d().direct_space_state
+		var query := PhysicsRayQueryParameters2D.create(start, to)
+		# Collide with world (layer 1) and player (layer 2)
+		query.collision_mask = (1 << 0) | (1 << 1)
+		var res := space_state.intersect_ray(query)
+		var end_point: Vector2 = (res.get("position", to)) as Vector2
+
 		var tracer: Tracer = TRACER_SCENE.instantiate()
 		scene_root.add_child(tracer)
+		tracer.speed_px_per_sec = tracer_speed_px_per_sec
+		tracer.fade_time = tracer_fade_time
 		tracer.fire_colored(start, end_point, Color(1, 0, 0, 1))  # bright red
 
 	# === MUZZLE FLASH (same as player) ===
