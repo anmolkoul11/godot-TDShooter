@@ -5,9 +5,19 @@ signal died
 
 var speed: float = 300.0
 
+@export var max_health: int = 3
+
+# Health regen settings
+@export var regen_delay: float = 5.0        # wait 5 seconds after damage
+@export var regen_per_second: float = 1.0   # heal 1 HP per second
+
+var health: int
+var _time_since_damage: float = 0.0
+var _regen_accum: float = 0.0
+
 const BULLET_SCENE  := preload("res://scenes/bullet.tscn")
 const MUZZLE_SCENE  := preload("res://scenes/muzzle_flash.tscn") # ok if missing
-const TRACER_SCENE  := preload("res://scenes/tracer.tscn")       # NEW
+const TRACER_SCENE  := preload("res://scenes/tracer.tscn")
 
 @export var shoot_cooldown: float = 0.12
 var _cooldown_left: float = 0.0
@@ -15,6 +25,9 @@ var _cooldown_left: float = 0.0
 @onready var camera_remote_transform: RemoteTransform2D = $CamRemoteTransform
 @onready var shoot_raycast: RayCast2D = $ShootRayCast
 @onready var shoot_sound: AudioStreamPlayer2D = $ShootSFX
+
+func _ready() -> void:
+	health = max_health
 
 func _process(delta: float) -> void:
 	look_at(get_global_mouse_position())
@@ -26,6 +39,9 @@ func _process(delta: float) -> void:
 	if Input.is_action_pressed("shoot") and _cooldown_left <= 0.0:
 		_fire_bullet()
 		_cooldown_left = shoot_cooldown
+
+	# Handle health regeneration
+	_handle_regen(delta)
 
 func _physics_process(_delta: float) -> void:
 	var move_dir := Vector2(
@@ -52,7 +68,7 @@ func _fire_bullet() -> void:
 	var dir := (get_global_mouse_position() - start).normalized()
 	bullet.setup(self, start, dir)
 
-	# === INSTANT TRACER (Option A) ===
+	# === INSTANT TRACER ===
 	if TRACER_SCENE:
 		# use the existing ShootRayCast to find the hit point; fallback to fixed length
 		shoot_raycast.force_raycast_update()
@@ -79,7 +95,50 @@ func _fire_bullet() -> void:
 	if shoot_sound:
 		shoot_sound.play()
 
-func _on_hitbox_body_entered(body: Node2D) -> void:
-	if body is Enemy:
+# func _on_hitbox_body_entered(body: Node2D) -> void:
+# 	if body is Enemy:
+# 		died.emit()
+# 		queue_free()
+
+func _handle_regen(delta: float) -> void:
+	# Already full, nothing to do
+	if health >= max_health:
+		_time_since_damage = 0.0
+		_regen_accum = 0.0
+		return
+
+	# Time since last damage
+	_time_since_damage += delta
+
+	# Wait until regen_delay has passed
+	if _time_since_damage < regen_delay:
+		return
+
+	# Accumulate fractional healing
+	_regen_accum += delta * regen_per_second
+
+	# Heal in whole HP steps
+	while _regen_accum >= 1.0 and health < max_health:
+		health += 1
+		_regen_accum -= 1.0
+		print("Player regenerated to health = %d" % health)
+
+	# Stop when full
+	if health >= max_health:
+		_time_since_damage = 0.0
+		_regen_accum = 0.0
+
+func take_damage(amount: int, attacker: Enemy) -> void:
+	if amount <= 0:
+		return
+
+	health -= amount
+	print("Player hit by %s, health = %d" % [attacker.name, health])
+
+	# Reset regen timer and accumulator on hit
+	_time_since_damage = 0.0
+	_regen_accum = 0.0
+
+	if health <= 0:
 		died.emit()
 		queue_free()
