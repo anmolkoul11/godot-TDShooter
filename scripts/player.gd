@@ -28,8 +28,10 @@ var _cooldown_left: float = 0.0
 @onready var shoot_raycast: RayCast2D = $ShootRayCast
 @onready var shoot_sound: AudioStreamPlayer2D = $ShootSFX
 
+
 func _ready() -> void:
 	health = max_health
+
 
 func _process(delta: float) -> void:
 	look_at(get_global_mouse_position())
@@ -45,8 +47,9 @@ func _process(delta: float) -> void:
 	# Handle health regeneration
 	_handle_regen(delta)
 
+
 func _physics_process(_delta: float) -> void:
-	var move_dir := Vector2(
+	var move_dir: Vector2 = Vector2(
 		Input.get_axis("move_left", "move_right"),
 		Input.get_axis("move_up", "move_down")
 	)
@@ -57,24 +60,25 @@ func _physics_process(_delta: float) -> void:
 		velocity.y = move_toward(velocity.y, 0, speed)
 	move_and_slide()
 
+
 func _fire_bullet() -> void:
 	var bullet: Bullet = BULLET_SCENE.instantiate()
-	var scene_root := get_tree().get_current_scene()
-	var bullets_node := scene_root.get_node_or_null("Bullets")
+	var scene_root: Node = get_tree().get_current_scene()
+	var bullets_node: Node = scene_root.get_node_or_null("Bullets")
 	if bullets_node:
 		bullets_node.add_child(bullet)
 	else:
 		scene_root.add_child(bullet)
 
-	var start := shoot_raycast.global_position
-	var dir := (get_global_mouse_position() - start).normalized()
+	var start: Vector2 = shoot_raycast.global_position
+	var dir: Vector2 = (get_global_mouse_position() - start).normalized()
 	bullet.setup(self, start, dir)
 
 	# === INSTANT TRACER ===
 	if TRACER_SCENE:
 		# use the existing ShootRayCast to find the hit point; fallback to fixed length
 		shoot_raycast.force_raycast_update()
-		var end_point := start + dir * 700.0
+		var end_point: Vector2 = start + dir * 700.0
 		if shoot_raycast.is_colliding():
 			end_point = shoot_raycast.get_collision_point()
 
@@ -88,23 +92,25 @@ func _fire_bullet() -> void:
 
 	# Optional muzzle flash (safe if scene exists)
 	if MUZZLE_SCENE:
-		var flash = MUZZLE_SCENE.instantiate()
+		var flash: Node = MUZZLE_SCENE.instantiate()
 		scene_root.add_child(flash)
 		flash.fire_at(start, dir.angle())
 
 	# Optional camera shake (if your Camera2D has the CameraShake script and is in group "main_camera")
-	var cam = get_tree().get_first_node_in_group("main_camera")
+	var cam: Node = get_tree().get_first_node_in_group("main_camera")
 	if cam and cam.has_method("shake"):
 		cam.shake(6.0, 0.08)
 
 	if shoot_sound:
 		shoot_sound.play()
 
+
 func _on_hitbox_body_entered(body: Node2D) -> void:
 	# If any enemy body touches the player's hitbox, the player dies immediately
-	if body is Enemy:
+	if body is Enemy or body is ExtendedBTEnemy:
 		died.emit()
 		queue_free()
+
 
 func _handle_regen(delta: float) -> void:
 	# Already full, nothing to do
@@ -134,12 +140,17 @@ func _handle_regen(delta: float) -> void:
 		_time_since_damage = 0.0
 		_regen_accum = 0.0
 
-func take_damage(amount: int, attacker: Enemy) -> void:
+
+func take_damage(amount: int, attacker: CharacterBody2D = null) -> void:
 	if amount <= 0:
 		return
 
 	health -= amount
-	print("Player hit by %s, health = %d" % [attacker.name, health])
+
+	var attacker_name: String = "Unknown"
+	if attacker != null:
+		attacker_name = attacker.name
+	print("Player hit by %s, health = %d" % [attacker_name, health])
 
 	# Reset regen timer and accumulator on hit
 	_time_since_damage = 0.0
