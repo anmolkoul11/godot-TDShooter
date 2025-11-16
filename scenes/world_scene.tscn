@@ -43,7 +43,7 @@ scale = Vector2(0.5, 0.5)
 [node name="MainCamera" type="Camera2D" parent="."]
 
 [node name="NavigationRegion2D" type="NavigationRegion2D" parent="."]
-position = Vector2(-999, -511)
+position = Vector2(-999, -525)
 navigation_polygon = SubResource("NavigationPolygon_ow06g")
 navigation_layers = 7
 metadata/_edit_group_ = true

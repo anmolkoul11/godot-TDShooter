@@ -33,7 +33,7 @@ func _run() -> void:
 		push_error("Couldn't find res://scripts/bullet.gd — make sure it exists.")
 
 	scene.pack(root)
-	var err := ResourceSaver.save("res://scenes/bullet.tscn", scene)
+	var err := ResourceSaver.save(scene, "res://scenes/bullet.tscn")
 	if err == OK:
 		print("Saved bullet scene: res://scenes/bullet.tscn")
 	else:
