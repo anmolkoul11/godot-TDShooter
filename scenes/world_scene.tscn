@@ -1,9 +1,10 @@
-[gd_scene load_steps=7 format=3 uid="uid://c26ytx1m2b0sm"]
+[gd_scene load_steps=8 format=3 uid="uid://c26ytx1m2b0sm"]
 
 [ext_resource type="PackedScene" uid="uid://bid5n228xcinl" path="res://scenes/box.tscn" id="1_jedrf"]
 [ext_resource type="Script" uid="uid://baewtts3ylpa0" path="res://scripts/world_scene.gd" id="1_ow06g"]
 [ext_resource type="PackedScene" uid="uid://bxhkm41gc4gl6" path="res://scenes/player.tscn" id="2_kjcoe"]
 [ext_resource type="PackedScene" uid="uid://buyxeqalv2e42" path="res://scenes/enemy.tscn" id="3_qiqor"]
+[ext_resource type="PackedScene" uid="uid://cn8ltvkk8fo1q" path="res://scenes/enemyBT.tscn" id="4_krmi5"]
 
 [sub_resource type="QuadMesh" id="QuadMesh_e8udx"]
 
@@ -38,6 +39,14 @@ scale = Vector2(0.5, 0.5)
 
 [node name="Enemy3" parent="." instance=ExtResource("3_qiqor")]
 position = Vector2(2059, 1275)
+scale = Vector2(0.5, 0.5)
+
+[node name="Enemy4(BT)" parent="." instance=ExtResource("4_krmi5")]
+position = Vector2(667, 1495)
+scale = Vector2(0.5, 0.5)
+
+[node name="Enemy5(BT)" parent="." instance=ExtResource("4_krmi5")]
+position = Vector2(1672, 396)
 scale = Vector2(0.5, 0.5)
 
 [node name="MainCamera" type="Camera2D" parent="."]

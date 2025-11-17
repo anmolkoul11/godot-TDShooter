@@ -45,7 +45,7 @@ func _on_area_entered(area: Area2D) -> void: _hit(area)
 func _hit(target: Object) -> void:
 	if target == _shooter:
 		return
-	if target is Enemy:
+	if target is Enemy or target is EnemyBT:
 		if debug_logs: print("[Bullet] Damaging enemy: ", target.name)
 		target.take_damage(damage, _shooter)
 		queue_free()

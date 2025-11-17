@@ -111,6 +111,6 @@ func _fire_bullet() -> void:
 		shoot_sound.play()
 
 func _on_hitbox_body_entered(body: Node2D) -> void:
-	if body is Enemy:
+	if body is Enemy or body is EnemyBT:
 		died.emit()
 		queue_free()
