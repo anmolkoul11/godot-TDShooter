@@ -2,7 +2,7 @@ extends CharacterBody2D
 class_name EnemyBT
 
 @export var speed: float = 150.0
-@export var stop_distance: float = 40.0
+@export var stop_distance: float = 60.0
 @export var hit_points: int = 3
 @export var show_path: bool = true
 
@@ -15,7 +15,7 @@ class_name EnemyBT
 @export var acceleration: float = 800.0
 @export var deceleration: float = 1200.0
 
-@export var detection_radius: float = 350.0  
+@export var detection_radius: float = 500.0  
 @export var debug_ai: bool = true
 
 var player: Player = null
@@ -24,6 +24,8 @@ var wander_target: Vector2
 var wander_timer := 0.0
 var path_timer := 0.0
 var stop_timer := 0.0
+var is_aggro: bool = false   
+
 
 @onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
 @onready var animation_player: AnimationPlayer = $AnimationPlayer
@@ -142,14 +144,10 @@ func _player_visible(_delta) -> bool:
 			return false
 
 	var dist := global_position.distance_to(player.global_position)
-	var player_visible := dist <= detection_radius
-
-	if visible:
-		_log("COND: _player_visible = TRUE (dist = %.1f)" % dist)
-	else:
-		_log("COND: _player_visible = FALSE (dist = %.1f)" % dist)
+	var player_visible := is_aggro or dist <= detection_radius
 
 	return player_visible
+
 
 
 func _player_in_stop_range(_delta) -> bool:
@@ -242,7 +240,8 @@ func take_damage(amount: int, attacker: Player) -> void:
 
 	if hit_points <= 0:
 		_die()
-
+	else:
+		is_aggro = true 
 
 func _die() -> void:
 	_log("DEAD")
