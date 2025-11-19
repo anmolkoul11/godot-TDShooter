@@ -1,7 +1,7 @@
 [gd_scene load_steps=9 format=3 uid="uid://cn8ltvkk8fo1q"]
 
 [ext_resource type="Script" uid="uid://tvepto58dlqi" path="res://scripts/enemy_bt.gd" id="1_qq7tn"]
-[ext_resource type="Texture2D" uid="uid://c5k6twbdchq0c" path="res://assets/enemy.png" id="2_ghv1t"]
+[ext_resource type="Texture2D" uid="uid://cljdgwyw1xe2j" path="res://assets/enemyBT.png" id="2_qq7tn"]
 [ext_resource type="AudioStream" uid="uid://b0unxyv1j12n4" path="res://sfx/slap-hurt-pain-sound-effect-262618.mp3" id="3_cmtk6"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_7p1mj"]
@@ -62,7 +62,7 @@ shape = SubResource("CapsuleShape2D_7p1mj")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
 position = Vector2(118, 59)
-texture = ExtResource("2_ghv1t")
+texture = ExtResource("2_qq7tn")
 
 [node name="PlayerDetection" type="Area2D" parent="."]
 collision_layer = 32
