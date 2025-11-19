@@ -69,7 +69,6 @@ collision_layer = 32
 collision_mask = 2
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="PlayerDetection"]
-visible = false
 position = Vector2(381, 77)
 shape = SubResource("CircleShape2D_7p1mj")
 

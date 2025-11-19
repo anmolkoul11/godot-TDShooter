@@ -6,243 +6,285 @@ class_name EnemyBT
 @export var hit_points: int = 3
 @export var show_path: bool = true
 
-# FSM params
 @export var wander_radius: float = 400.0
-@export var wander_interval: float = 2.5         # How often to pick a new wander point
-@export var stop_duration: float = 2.0            # Stop state duration
+@export var wander_interval: float = 2.5
+@export var path_refresh_interval: float = 0.35
+@export var stop_duration: float = 2.0
 
-# Motion smoothing
-@export var rotation_speed: float = 8.0           # Radians per second for smooth rotation
-@export var acceleration: float = 800.0           # Pixels per second squared
-@export var deceleration: float = 1200.0          # Pixels per second squared (for stopping)
+@export var rotation_speed: float = 8.0
+@export var acceleration: float = 800.0
+@export var deceleration: float = 1200.0
 
-# BT path tracer
-var trail_points: Array[Vector2] = []
-@export var trail_interval: float = 0.1
-var trail_timer: float = 0.0
-
+@export var detection_radius: float = 350.0  
 @export var debug_ai: bool = true
-
-enum State { IDLE, CHASE, STOP, RETREAT, DEAD }
-var state: State = State.IDLE
 
 var player: Player = null
 var home_position: Vector2
 var wander_target: Vector2
-var wander_timer: float = 0.0
-var path_timer: float = 0.0
-var stop_timer: float = 0.0
+var wander_timer := 0.0
+var path_timer := 0.0
+var stop_timer := 0.0
 
 @onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
 @onready var animation_player: AnimationPlayer = $AnimationPlayer
 @onready var hurt_sound: AudioStreamPlayer2D = $HurtSound
 
-func _ready() -> void:
+# SIMPLE BEHAVIOR TREE NODES
+func BT_Leaf(func_ref):
+	return {
+		"type": "leaf",
+		"func": func_ref
+	}
+
+func BT_Selector(children):
+	return {
+		"type": "selector",
+		"children": children
+	}
+
+func BT_Run(node: Dictionary, delta):
+	match node["type"]:
+		"leaf":
+			return node["func"].call(delta)
+
+		"selector":
+			for c in node["children"]:
+				if BT_Run(c, delta):
+					return true
+			return false
+
+	return false
+
+
+# BUILD BEHAVIOR TREE
+var root: Dictionary
+
+func _ready():
 	home_position = global_position
+
 	nav_agent.path_desired_distance = 20
 	nav_agent.target_desired_distance = 20
 	nav_agent.radius = 30
 	nav_agent.avoidance_enabled = false
+
 	_pick_new_wander_target()
-	_log("READY -> IDLE")
+	_ensure_player_ref()
 
-func _process(_delta: float) -> void:
-	if show_path:
-		queue_redraw()
+	root = BT_Selector([
+		BT_Leaf(_state_dead),
+		BT_Leaf(_state_combat),
+		BT_Leaf(_state_idle_or_retreat)
+	])
 
-func _physics_process(delta: float) -> void:
-	match state:
-		State.DEAD:
-			velocity = Vector2.ZERO
-		State.IDLE:
-			_do_idle(delta)
-		State.CHASE:
-			_do_chase(delta)
-		State.STOP:
-			_do_stop(delta)
-		State.RETREAT:
-			_do_retreat(delta)
-
-	# --- Record BT movement path only while chasing ---
-	if state == State.CHASE:
-		trail_timer += delta
-		if trail_timer >= trail_interval:
-			trail_points.append(global_position)
-			if trail_points.size() > 120:
-				trail_points.pop_front()
-			trail_timer = 0.0
-	# --------------------------------------------------
-
+func _physics_process(delta):
+	BT_Run(root, delta)
 	move_and_slide()
+	queue_redraw()
 
-# ---------------- STATES ----------------
 
-func _do_idle(delta: float) -> void:
+# STATE LEAVES
+func _state_dead(_delta) -> bool:
+	if hit_points <= 0:
+		_do_dead()
+		return true
+	return false
+
+
+func _state_combat(delta) -> bool:
+	if not _player_visible(delta):
+		return false 
+
+	if _player_in_stop_range(delta):
+		_log("State: STOP (combat)")
+		_do_stop(delta)
+	else:
+		_log("State: CHASE (combat)")
+		_do_chase(delta)
+
+	return true
+
+
+func _state_idle_or_retreat(delta) -> bool:
+	_log("State: IDLE/WANDER")
+	_do_idle(delta)
+	return true
+
+
+# PLAYER LOOKUP HELPERS 
+func _ensure_player_ref() -> void:
+	if player != null:
+		return
+
+	var root_node := get_tree().root
+	player = _find_player_in_subtree(root_node)
+
+	if player != null:
+		_log("Found Player node in tree: %s" % player.name)
+	else:
+		_log("WARNING: Player node not found in tree")
+
+
+func _find_player_in_subtree(node: Node) -> Player:
+	if node is Player:
+		return node
+
+	for child in node.get_children():
+		var found := _find_player_in_subtree(child)
+		if found != null:
+			return found
+
+	return null
+
+func _player_visible(_delta) -> bool:
+	if player == null:
+		_ensure_player_ref()
+		if player == null:
+			return false
+
+	var dist := global_position.distance_to(player.global_position)
+	var player_visible := dist <= detection_radius
+
+	if visible:
+		_log("COND: _player_visible = TRUE (dist = %.1f)" % dist)
+	else:
+		_log("COND: _player_visible = FALSE (dist = %.1f)" % dist)
+
+	return player_visible
+
+
+func _player_in_stop_range(_delta) -> bool:
+	if not player:
+		return false
+	return global_position.distance_to(player.global_position) <= stop_distance
+
+
+# PATH LOGIC
+func _do_dead() -> void:
+	velocity = Vector2.ZERO
+	_log("State: DEAD")
+
+
+func _do_idle(delta):
 	wander_timer += delta
 	var to_target = wander_target - global_position
+
 	if to_target.length() < 10 or wander_timer >= wander_interval:
 		_pick_new_wander_target()
 		wander_timer = 0.0
+		_log("New wander target chosen")
+
 	var dir = to_target.normalized()
 	var target_velocity = dir * speed * 0.55
 	velocity = velocity.move_toward(target_velocity, acceleration * delta)
 	_face_direction_smooth(dir, delta)
-	# Transition on detection
-	if player:
-		_change_state(State.CHASE)
 
-# Pure BT-style seek: no A*, move directly toward player
-func _do_chase(delta: float) -> void:
+
+func _do_chase(delta):
 	if not player:
-		_change_state(State.IDLE)
 		return
 
-	var to_player: Vector2 = player.global_position - global_position
-	var distance: float = to_player.length()
+	path_timer += delta
 
-	if distance > stop_distance:
-		var dir := to_player.normalized()
+	if path_timer >= path_refresh_interval or nav_agent.is_navigation_finished():
+		nav_agent.target_position = player.global_position
+		path_timer = 0.0
+		_log("Path updated toward player")
+
+	if not nav_agent.is_navigation_finished():
+		var next_pos = nav_agent.get_next_path_position()
+		var dir = (next_pos - global_position).normalized()
 		var target_velocity = dir * speed
+
 		velocity = velocity.move_toward(target_velocity, acceleration * delta)
 		_face_direction_smooth(dir, delta)
 	else:
 		velocity = velocity.move_toward(Vector2.ZERO, deceleration * delta)
-		_change_state(State.STOP)
 
-func _do_stop(delta: float) -> void:
+
+func _do_stop(delta):
 	velocity = velocity.move_toward(Vector2.ZERO, deceleration * delta)
 	stop_timer += delta
-	# Face player if present, else face last wander target
+
 	if player:
 		var dir = (player.global_position - global_position).normalized()
 		_face_direction_smooth(dir, delta)
+
 	if stop_timer >= stop_duration:
-		# After stop: if player still near, re-enter CHASE; else RETREAT back home
-		if player and global_position.distance_to(player.global_position) > stop_distance:
-			_change_state(State.CHASE)
-		else:
-			_change_state(State.RETREAT)
+		stop_timer = 0.0
+		_log("Stop expired")
 
-func _do_retreat(delta: float) -> void:
-	var to_home = home_position - global_position
-	if to_home.length() < 20:
-		# Reached home, transition to IDLE
-		_change_state(State.IDLE)
-		return
-	# Move toward home (BT-style steering)
-	var dir = to_home.normalized()
-	var target_velocity = dir * speed * 0.7
-	velocity = velocity.move_toward(target_velocity, acceleration * delta)
-	_face_direction_smooth(dir, delta)
-	# If player re-enters detection, immediately chase again
-	if player:
-		_change_state(State.CHASE)
 
-# ---------------- EVENTS ----------------
+#func _do_retreat(delta):
+	#var to_home = home_position - global_position
+	#if to_home.length() < 20:
+		#return
+#
+	#var dir = to_home.normalized()
+	#var target_velocity = dir * speed * 0.7
+#
+	#velocity = velocity.move_toward(target_velocity, acceleration * delta)
+	#_face_direction_smooth(dir, delta)
 
 func take_damage(amount: int, attacker: Player) -> void:
-	if state == State.DEAD or amount <= 0:
+	if amount <= 0:
 		return
-	player = attacker
+
+	player = attacker 
 	hit_points -= amount
-	hurt_sound.play()
-	if animation_player.has_animation("take_damage"):
+
+	if hurt_sound:
+		hurt_sound.play()
+
+	if animation_player and animation_player.has_animation("take_damage"):
 		animation_player.play("take_damage")
-	_log("DAMAGE -> %d HP left" % hit_points)
+
+	_log("DAMAGE: -%d HP -> %d left" % [amount, hit_points])
+
 	if hit_points <= 0:
 		_die()
-	else:
-		_change_state(State.CHASE)
+
 
 func _die() -> void:
-	state = State.DEAD
-	velocity = Vector2.ZERO
-	if animation_player.has_animation("dead"):
-		animation_player.play("dead")
 	_log("DEAD")
+	velocity = Vector2.ZERO
+
+	if animation_player and animation_player.has_animation("death"):
+		animation_player.play("death")
+
+	await get_tree().create_timer(0.5).timeout
 	queue_free()
 
-# Connected to PlayerDetection Area2D signals
-func _on_player_detection_body_entered(body: Node) -> void:
-	if body is Player:
-		player = body
-		_log("DETECTION ENTER")
-		if state != State.DEAD:
-			_change_state(State.CHASE)
 
-func _on_player_detection_body_exited(body: Node) -> void:
-	if body is Player and body == player:
-		player = null
-		_log("DETECTION EXIT")
-		if state == State.CHASE:
-			_change_state(State.STOP)
+# UTILITIES
+func _pick_new_wander_target():
+	var angle = randf() * TAU
+	wander_target = home_position + Vector2(cos(angle), sin(angle)) * wander_radius
+	_log("New wander target set")
 
-# ---------------- HELPERS ----------------
 
-func _pick_new_wander_target() -> void:
-	var rand_dir = Vector2(randf() * 2 - 1, randf() * 2 - 1).normalized()
-	var radius = randf() * wander_radius
-	wander_target = home_position + rand_dir * radius
-	_log("NEW WANDER TARGET %s" % wander_target)
-
-func _change_state(new_state: State) -> void:
-	if state == new_state:
+func _face_direction_smooth(dir, delta):
+	if dir == Vector2.ZERO:
 		return
-	state = new_state
-	match state:
-		State.IDLE:
-			wander_timer = 0.0
-			_pick_new_wander_target()
-		State.CHASE:
-			path_timer = 0.0
-			stop_timer = 0.0
-			trail_points.clear()
-			trail_timer = 0.0
-			# no nav_agent path for movement (pure BT steering)
-		State.STOP:
-			stop_timer = 0.0
-		State.RETREAT:
-			path_timer = 0.0
-		State.DEAD:
-			pass
-	_log("STATE -> %s" % _state_name(state))
-
-func _state_name(s: State) -> String:
-	match s:
-		State.IDLE: return "IDLE"
-		State.CHASE: return "CHASE"
-		State.STOP: return "STOP"
-		State.RETREAT: return "RETREAT"
-		State.DEAD: return "DEAD"
-	return "?"
-
-func _face_direction(dir: Vector2) -> void:
-	if dir.length() > 0.001:
-		rotation = dir.angle()
-
-func _face_direction_smooth(dir: Vector2, delta: float) -> void:
-	if dir.length() > 0.001:
-		var target_angle = dir.angle()
-		var angle_diff = angle_difference(rotation, target_angle)
-		var max_rotation = rotation_speed * delta
-		if abs(angle_diff) < max_rotation:
-			rotation = target_angle
-		else:
-			rotation += sign(angle_diff) * max_rotation
+	var target_rot = dir.angle()
+	rotation = lerp_angle(rotation, target_rot, rotation_speed * delta)
 
 func _draw() -> void:
 	if not show_path:
 		return
-	if state != State.CHASE:
-		return
-	if trail_points.size() < 2:
+
+	var path = nav_agent.get_current_navigation_path()
+	if path.size() < 2:
 		return
 
-	for i in range(trail_points.size() - 1):
-		var a = to_local(trail_points[i])
-		var b = to_local(trail_points[i + 1])
-		draw_line(a, b, Color.YELLOW, 2.0)
-
+	for i in range(path.size() - 1):
+		draw_line(
+			to_local(path[i]),
+			to_local(path[i + 1]),
+			Color.YELLOW,
+			2.0
+		)
+		
+#LOGGING
 func _log(msg: String) -> void:
 	if debug_ai:
-		print("[Enemy %s] %s" % [name, msg])
+		print("[EnemyBT %s] %s" % [name, msg])
