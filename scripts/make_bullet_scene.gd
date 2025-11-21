@@ -7,9 +7,9 @@ func _run() -> void:
 	# Root Area2D
 	var root := Area2D.new()
 	root.name = "Bullet"
-	# Layer 8 (1 << 7 = 128). Mask = World (1<<0) + Enemy (1<<2) = 1 + 4 = 5
+	# Layer 8 (1 << 7 = 128). Mask = World + Player + Player hitbox + Enemy + Enemy hitbox
 	root.collision_layer = 1 << 7
-	root.collision_mask  = (1 << 0) | (1 << 2)
+	root.collision_mask  = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4)
 
 	# Collision shape (small circle)
 	var col := CollisionShape2D.new()
@@ -33,8 +33,13 @@ func _run() -> void:
 		push_error("Couldn't find res://scripts/bullet.gd — make sure it exists.")
 
 	scene.pack(root)
-	var err := ResourceSaver.save(scene, "res://scenes/bullet.tscn")
+	var target_path := "res://scenes/bullet.tscn"
+	if ResourceLoader.exists(target_path):
+		push_warning("Bullet scene already exists at %s — skipping save. Delete it if you want to regenerate." % target_path)
+		return
+
+	var err := ResourceSaver.save(scene, target_path)
 	if err == OK:
-		print("Saved bullet scene: res://scenes/bullet.tscn")
+		print("Saved bullet scene: %s" % target_path)
 	else:
 		push_error("Failed to save bullet scene, code: %s" % err)

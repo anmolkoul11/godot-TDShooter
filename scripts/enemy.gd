@@ -1,6 +1,10 @@
 extends CharacterBody2D
 class_name Enemy
 
+const BULLET_SCENE  := preload("res://scenes/bullet.tscn")
+const MUZZLE_SCENE  := preload("res://scenes/muzzle_flash.tscn")
+const TRACER_SCENE  := preload("res://scenes/tracer.tscn")
+
 @export var speed: float = 150.0
 @export var stop_distance: float = 40.0
 @export var hit_points: int = 3
@@ -32,6 +36,7 @@ var stop_timer: float = 0.0
 @onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
 @onready var animation_player: AnimationPlayer = $AnimationPlayer
 @onready var hurt_sound: AudioStreamPlayer2D = $HurtSound
+@onready var shooter: Node = $EnemyShooter
 
 func _ready() -> void:
 	home_position = global_position
@@ -94,6 +99,9 @@ func _do_chase(delta: float) -> void:
 		_face_direction_smooth(dir, delta)
 	else:
 		velocity = velocity.move_toward(Vector2.ZERO, deceleration * delta)
+	# Try to fire at player if in range
+	if player and is_instance_valid(player):
+		shooter.try_fire_at_target(self, player)
 	# Stop distance -> STOP state
 	if global_position.distance_to(player.global_position) <= stop_distance:
 		_change_state(State.STOP)
@@ -105,6 +113,9 @@ func _do_stop(delta: float) -> void:
 	if player:
 		var dir = (player.global_position - global_position).normalized()
 		_face_direction_smooth(dir, delta)
+	# Shoot at player during stop
+	if player and is_instance_valid(player):
+		shooter.try_fire_at_target(self, player)
 	if stop_timer >= stop_duration:
 		# After stop: if player still near, re-enter CHASE; else RETREAT back home
 		if player and global_position.distance_to(player.global_position) > stop_distance:

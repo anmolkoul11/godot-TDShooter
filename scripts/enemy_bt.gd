@@ -1,6 +1,10 @@
 extends CharacterBody2D
 class_name EnemyBT
 
+const BULLET_SCENE := preload("res://scenes/bullet.tscn")
+const MUZZLE_SCENE := preload("res://scenes/muzzle_flash.tscn")
+const TRACER_SCENE := preload("res://scenes/tracer.tscn")
+
 @export var speed: float = 150.0
 @export var stop_distance: float = 60.0
 @export var hit_points: int = 3
@@ -15,7 +19,9 @@ class_name EnemyBT
 @export var acceleration: float = 800.0
 @export var deceleration: float = 1200.0
 
-@export var detection_radius: float = 500.0  
+@export var detection_radius: float = 500.0
+@export var fire_range: float = 800.0             # Max range to shoot player
+@export var fire_interval: float = 0.9            # Interval between shots (seconds)
 @export var debug_ai: bool = true
 
 var player: Player = null
@@ -30,6 +36,7 @@ var is_aggro: bool = false
 @onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
 @onready var animation_player: AnimationPlayer = $AnimationPlayer
 @onready var hurt_sound: AudioStreamPlayer2D = $HurtSound
+@onready var shooter: Node = $EnemyShooter
 
 # SIMPLE BEHAVIOR TREE NODES
 func BT_Leaf(func_ref):
@@ -198,6 +205,10 @@ func _do_chase(delta):
 	else:
 		velocity = velocity.move_toward(Vector2.ZERO, deceleration * delta)
 
+	# Try to fire at player if in range
+	if player and is_instance_valid(player):
+		shooter.try_fire_at_target(self, player)
+
 
 func _do_stop(delta):
 	velocity = velocity.move_toward(Vector2.ZERO, deceleration * delta)
@@ -206,6 +217,10 @@ func _do_stop(delta):
 	if player:
 		var dir = (player.global_position - global_position).normalized()
 		_face_direction_smooth(dir, delta)
+
+	# Shoot at player during stop
+	if player and is_instance_valid(player):
+		shooter.try_fire_at_target(self, player)
 
 	if stop_timer >= stop_duration:
 		stop_timer = 0.0

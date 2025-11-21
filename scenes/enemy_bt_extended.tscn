@@ -1,11 +1,10 @@
-[gd_scene load_steps=10 format=3 uid="uid://buyxeqalv2e42"]
+[gd_scene load_steps=13 format=3 uid="uid://c4m8jrlqakf5q"]
 
-[ext_resource type="Script" uid="uid://dhjodku54cs8b" path="res://scripts/enemy.gd" id="1_md0e3"]
-[ext_resource type="Texture2D" uid="uid://c5k6twbdchq0c" path="res://assets/enemy.png" id="2_4ra3w"]
-[ext_resource type="AudioStream" uid="uid://b0unxyv1j12n4" path="res://sfx/slap-hurt-pain-sound-effect-262618.mp3" id="3_4ra3w"]
-[ext_resource type="AudioStream" path="res://sfx/walther-p38-firing-sound-effect-11651.mp3" id="4_shoot"]
+[ext_resource type="Script" uid="uid://ddf23wg6xyv50" path="res://scripts/enemy_bt_extended.gd" id="1_ext_bt"]
+[ext_resource type="Texture2D" uid="uid://d3vw8thmjao6v" path="res://assets/enemyEXT.png" id="2_42dh2"]
+[ext_resource type="AudioStream" uid="uid://b0unxyv1j12n4" path="res://sfx/slap-hurt-pain-sound-effect-262618.mp3" id="3_hurt_sound"]
+[ext_resource type="AudioStream" uid="uid://ddm52lcu1s1rw" path="res://sfx/walther-p38-firing-sound-effect-11651.mp3" id="4_shoot"]
 [ext_resource type="Script" path="res://scripts/enemy_shooter.gd" id="5_shooter"]
-
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_7p1mj"]
 radius = 83.0
@@ -16,6 +15,40 @@ radius = 791.0765
 
 [sub_resource type="Animation" id="Animation_4ra3w"]
 length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Sprite2D:modulate")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Color(1, 1, 1, 1)]
+}
+
+[sub_resource type="Animation" id="Animation_idle"]
+resource_name = "idle"
+length = 0.001
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Sprite2D:modulate")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Color(1, 1, 1, 1)]
+}
+
+[sub_resource type="Animation" id="Animation_run"]
+resource_name = "run"
+length = 0.001
+loop_mode = 1
 tracks/0/type = "value"
 tracks/0/imported = false
 tracks/0/enabled = true
@@ -48,15 +81,17 @@ tracks/0/keys = {
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_5uy6h"]
 _data = {
 &"RESET": SubResource("Animation_4ra3w"),
+&"idle": SubResource("Animation_idle"),
+&"run": SubResource("Animation_run"),
 &"take_damage": SubResource("Animation_md0e3")
 }
 
-[node name="Enemy" type="CharacterBody2D"]
+[node name="ExtendedBTEnemy" type="CharacterBody2D"]
 collision_layer = 4
 collision_mask = 9
 motion_mode = 1
 wall_min_slide_angle = 0.0
-script = ExtResource("1_md0e3")
+script = ExtResource("1_ext_bt")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 modulate = Color(0.8901961, 0, 0, 1)
@@ -65,7 +100,7 @@ shape = SubResource("CapsuleShape2D_7p1mj")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
 position = Vector2(118, 59)
-texture = ExtResource("2_4ra3w")
+texture = ExtResource("2_42dh2")
 
 [node name="PlayerDetection" type="Area2D" parent="."]
 collision_layer = 32
@@ -82,7 +117,7 @@ libraries = {
 }
 
 [node name="HurtSound" type="AudioStreamPlayer2D" parent="."]
-stream = ExtResource("3_4ra3w")
+stream = ExtResource("3_hurt_sound")
 
 [node name="NavigationAgent2D" type="NavigationAgent2D" parent="."]
 
@@ -90,15 +125,18 @@ stream = ExtResource("3_4ra3w")
 wait_time = 0.3
 autostart = true
 
+[node name="ShootTimer" type="Timer" parent="."]
+wait_time = 0.9
+autostart = true
+
 [node name="ShootSFX" type="AudioStreamPlayer2D" parent="."]
 stream = ExtResource("4_shoot")
 
 [node name="EnemyShooter" type="Node" parent="."]
 script = ExtResource("5_shooter")
-fire_range = 800.0
-fire_interval = 0.9
-
+fire_range = 900.0
+fire_interval = 0.6
 
 [connection signal="body_entered" from="PlayerDetection" to="." method="_on_player_detection_body_entered"]
 [connection signal="body_exited" from="PlayerDetection" to="." method="_on_player_detection_body_exited"]
-
+[connection signal="timeout" from="ShootTimer" to="." method="_on_shoot_timer_timeout"]
