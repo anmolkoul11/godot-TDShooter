@@ -1,287 +1,304 @@
 extends CharacterBody2D
-class_name ExtendedBTEnemy
-
-@export var speed: float = 150.0
-@export var stop_distance: float = 40.0
-@export var flank_radius: float = 260.0
-@export var hit_points: int = 3
-
-# === Behaviour tuning ===
-@export var wander_radius: float = 600.0           # how far from spawn we wander
-@export var fire_range: float = 900.0              # max range we try to shoot the player
-@export var stage1_fire_interval: float = 0.8      # approximate Stage 1 interval
-@export var fire_interval_factor: float = 0.7      # Stage 2 fires ~30% faster
-
-enum EnemyState { WANDER, ENGAGE }
-
-var player: Player = null
-var direction: Vector2 = Vector2.ZERO
-var _state: EnemyState = EnemyState.WANDER
-var _aggro: bool = false
-
-var _wander_center: Vector2 = Vector2.ZERO
-var _wander_target: Vector2 = Vector2.ZERO
-var _has_wander_target: bool = false
-
-var _current_target: Vector2 = Vector2.ZERO
-
-var _fire_interval: float = 0.6
-var _fire_cooldown_left: float = 0.0
+class_name EnemyBT
 
 const BULLET_SCENE := preload("res://scenes/bullet.tscn")
 const MUZZLE_SCENE := preload("res://scenes/muzzle_flash.tscn")
 const TRACER_SCENE := preload("res://scenes/tracer.tscn")
 
+@export var speed: float = 150.0
+@export var stop_distance: float = 60.0
+@export var hit_points: int = 3
+@export var show_path: bool = true
+
+@export var wander_radius: float = 400.0
+@export var wander_interval: float = 2.5
+@export var path_refresh_interval: float = 0.35
+@export var stop_duration: float = 2.0
+
+@export var rotation_speed: float = 8.0
+@export var acceleration: float = 800.0
+@export var deceleration: float = 1200.0
+
+@export var detection_radius: float = 500.0
+@export var fire_range: float = 800.0             # Max range to shoot player
+@export var fire_interval: float = 0.9            # Interval between shots (seconds)
+@export var debug_ai: bool = true
+
+var player: Player = null
+var home_position: Vector2
+var wander_target: Vector2
+var wander_timer := 0.0
+var path_timer := 0.0
+var stop_timer := 0.0
+var is_aggro: bool = false   
+
+
+@onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
 @onready var animation_player: AnimationPlayer = $AnimationPlayer
 @onready var hurt_sound: AudioStreamPlayer2D = $HurtSound
-@onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
-@onready var _timer: Timer = $Timer
+@onready var shooter: Node = $EnemyShooter
 
-var squad: SquadCoordinator = null
+# SIMPLE BEHAVIOR TREE NODES
+func BT_Leaf(func_ref):
+	return {
+		"type": "leaf",
+		"func": func_ref
+	}
 
+func BT_Selector(children):
+	return {
+		"type": "selector",
+		"children": children
+	}
 
-func _ready() -> void:
-	randomize()
+func BT_Run(node: Dictionary, delta):
+	match node["type"]:
+		"leaf":
+			return node["func"].call(delta)
 
-	_wander_center = global_position
-	_fire_interval = stage1_fire_interval * fire_interval_factor
+		"selector":
+			for c in node["children"]:
+				if BT_Run(c, delta):
+					return true
+			return false
 
-	if _timer and not _timer.timeout.is_connected(_on_timer_timeout):
-		_timer.timeout.connect(_on_timer_timeout)
-
-	if nav_agent:
-		nav_agent.path_desired_distance = 30.0
-		nav_agent.target_desired_distance = 30.0
-		nav_agent.radius = 40.0
-		nav_agent.max_speed = speed
-		nav_agent.avoidance_enabled = true
-		nav_agent.avoidance_layers = 1
-		nav_agent.avoidance_mask = 1
-
-	var root: Node = get_tree().get_current_scene()
-	if root and root.has_node("SquadCoordinator"):
-		squad = root.get_node("SquadCoordinator") as SquadCoordinator
-		squad.register_enemy(self)
-
-	# IMPORTANT: we do NOT set `player` here.
-	# `player` will be assigned only when:
-	#  - PlayerDetection Area2D sees the player, OR
-	#  - the player shoots us (take_damage).
+	return false
 
 
-func _exit_tree() -> void:
-	if squad:
-		squad.unregister_enemy(self)
+# BUILD BEHAVIOR TREE
+var root: Dictionary
 
+func _ready():
+	home_position = global_position
 
-func _process(_delta: float) -> void:
-	if player and is_instance_valid(player):
-		look_at(player.global_position)
+	nav_agent.path_desired_distance = 20
+	nav_agent.target_desired_distance = 20
+	nav_agent.radius = 30
+	nav_agent.avoidance_enabled = false
 
+	_pick_new_wander_target()
+	_ensure_player_ref()
 
-func _physics_process(delta: float) -> void:
-	_fire_cooldown_left = max(0.0, _fire_cooldown_left - delta)
+	root = BT_Selector([
+		BT_Leaf(_state_dead),
+		BT_Leaf(_state_combat),
+		BT_Leaf(_state_idle_or_retreat)
+	])
 
-	# === State selection ===
-	# If we currently have a valid player target, engage; otherwise wander.
-	if player != null and is_instance_valid(player):
-		_state = EnemyState.ENGAGE
-	elif not _aggro:
-		_state = EnemyState.WANDER
-
-	# === Behaviour per state ===
-	match _state:
-		EnemyState.WANDER:
-			_state_wander()
-		EnemyState.ENGAGE:
-			_state_engage()
-
-	_move_character()
-
-
-# ======================
-#  States
-# ======================
-
-func _state_wander() -> void:
-	if not _has_wander_target or global_position.distance_to(_wander_target) < 30.0:
-		_pick_new_wander_target()
-
-	if nav_agent:
-		if nav_agent.is_navigation_finished():
-			nav_agent.target_position = _wander_target
-		var next_pos: Vector2 = nav_agent.get_next_path_position()
-		direction = (next_pos - global_position).normalized()
-	else:
-		direction = (_wander_target - global_position).normalized()
-
-	var desired_velocity: Vector2 = direction * (speed * 0.5) # wander slower
-	velocity = desired_velocity
-	if nav_agent:
-		nav_agent.set_velocity(desired_velocity)
-
-	if animation_player.current_animation != "run":
-		animation_player.play("run")
-
-
-func _state_engage() -> void:
-	if player == null or not is_instance_valid(player):
-		return
-
-	# Use flanking from the SquadCoordinator if available; otherwise just chase
-	if squad:
-		_current_target = squad.get_flank_target_position(self, flank_radius)
-	else:
-		_current_target = player.global_position
-
-	var dist_to_target: float = global_position.distance_to(_current_target)
-
-	var dir: Vector2
-	if nav_agent:
-		if nav_agent.is_navigation_finished():
-			nav_agent.target_position = _current_target
-		var next_pos: Vector2 = nav_agent.get_next_path_position()
-		dir = (next_pos - global_position).normalized()
-	else:
-		dir = (_current_target - global_position).normalized()
-
-	if dist_to_target > stop_distance and dir != Vector2.ZERO:
-		var desired_velocity: Vector2 = dir * speed
-		velocity = desired_velocity
-		if nav_agent:
-			nav_agent.set_velocity(desired_velocity)
-	else:
-		velocity = Vector2.ZERO
-		if nav_agent:
-			nav_agent.set_velocity(Vector2.ZERO)
-
-	_try_fire_at_player()
-
-
-func _pick_new_wander_target() -> void:
-	var angle: float = randf() * TAU
-	var radius: float = randf() * wander_radius
-	var offset: Vector2 = Vector2(cos(angle), sin(angle)) * radius
-	_wander_target = _wander_center + offset
-	_has_wander_target = true
-	if nav_agent:
-		nav_agent.target_position = _wander_target
-
-
-# ======================
-#  Shooting (with red tracers, faster than Stage 1)
-# ======================
-
-func _try_fire_at_player() -> void:
-	if _fire_cooldown_left > 0.0:
-		return
-	if player == null or not is_instance_valid(player):
-		return
-
-	var to_player: Vector2 = player.global_position - global_position
-	var distance: float = to_player.length()
-	if distance > fire_range:
-		return
-
-	var dir: Vector2 = to_player.normalized()
-
-	# Slight inaccuracy (for logs similar to Stage 1)
-	var accuracy: float = randf_range(0.4, 0.9)
-	var max_spread: float = (1.0 - accuracy) * 0.25
-	var spread: float = randf_range(-max_spread, max_spread)
-	dir = dir.rotated(spread)
-
-	var start: Vector2 = global_position
-	var scene_root: Node = get_tree().get_current_scene()
-
-	# Bullet
-	var bullet: Bullet = BULLET_SCENE.instantiate()
-	var bullets_node: Node = scene_root.get_node_or_null("Bullets")
-	if bullets_node:
-		bullets_node.add_child(bullet)
-	else:
-		scene_root.add_child(bullet)
-
-	bullet.setup(self, start, dir)
-
-	# 🔴 Tracer – enemy shots are red
-	if TRACER_SCENE:
-		var tracer: Node2D = TRACER_SCENE.instantiate()
-		scene_root.add_child(tracer)
-
-		# tint tracer red
-		tracer.modulate = Color(1.0, 0.0, 0.0)
-
-		var end_point: Vector2 = start + dir * fire_range
-		if tracer.has_method("fire"):
-			tracer.call("fire", start, end_point)
-
-	# Muzzle flash
-	if MUZZLE_SCENE:
-		var flash: Node = MUZZLE_SCENE.instantiate()
-		scene_root.add_child(flash)
-		if flash.has_method("fire_at"):
-			flash.call("fire_at", start, dir.angle())
-
-	print("%s fired at player with accuracy %.2f" % [name, accuracy])
-
-	_fire_cooldown_left = _fire_interval
-
-
-# ======================
-#  Movement + damage
-# ======================
-
-func _move_character() -> void:
-	if velocity.length() > 0.1:
-		animation_player.play("run")
-	else:
-		if animation_player.current_animation != "idle":
-			animation_player.play("idle")
-
+func _physics_process(delta):
+	BT_Run(root, delta)
 	move_and_slide()
+	queue_redraw()
 
+
+# STATE LEAVES
+func _state_dead(_delta) -> bool:
+	if hit_points <= 0:
+		_do_dead()
+		return true
+	return false
+
+
+func _state_combat(delta) -> bool:
+	if not _player_visible(delta):
+		return false 
+
+	if _player_in_stop_range(delta):
+		_log("State: STOP (combat)")
+		_do_stop(delta)
+	else:
+		_log("State: CHASE (combat)")
+		_do_chase(delta)
+
+	return true
+
+
+func _state_idle_or_retreat(delta) -> bool:
+	_log("State: IDLE/WANDER")
+	_do_idle(delta)
+	return true
+
+
+# PLAYER LOOKUP HELPERS 
+func _ensure_player_ref() -> void:
+	if player != null:
+		return
+
+	var root_node := get_tree().root
+	player = _find_player_in_subtree(root_node)
+
+	if player != null:
+		_log("Found Player node in tree: %s" % player.name)
+	else:
+		_log("WARNING: Player node not found in tree")
+
+
+func _find_player_in_subtree(node: Node) -> Player:
+	if node is Player:
+		return node
+
+	for child in node.get_children():
+		var found := _find_player_in_subtree(child)
+		if found != null:
+			return found
+
+	return null
+
+func _player_visible(_delta) -> bool:
+	if player == null:
+		_ensure_player_ref()
+		if player == null:
+			return false
+
+	var dist := global_position.distance_to(player.global_position)
+	var player_visible := is_aggro or dist <= detection_radius
+
+	return player_visible
+
+
+
+func _player_in_stop_range(_delta) -> bool:
+	if not player:
+		return false
+	return global_position.distance_to(player.global_position) <= stop_distance
+
+
+# PATH LOGIC
+func _do_dead() -> void:
+	velocity = Vector2.ZERO
+	_log("State: DEAD")
+
+
+func _do_idle(delta):
+	wander_timer += delta
+	var to_target = wander_target - global_position
+
+	if to_target.length() < 10 or wander_timer >= wander_interval:
+		_pick_new_wander_target()
+		wander_timer = 0.0
+		_log("New wander target chosen")
+
+	var dir = to_target.normalized()
+	var target_velocity = dir * speed * 0.55
+	velocity = velocity.move_toward(target_velocity, acceleration * delta)
+	_face_direction_smooth(dir, delta)
+
+
+func _do_chase(delta):
+	if not player:
+		return
+
+	path_timer += delta
+
+	if path_timer >= path_refresh_interval or nav_agent.is_navigation_finished():
+		nav_agent.target_position = player.global_position
+		path_timer = 0.0
+		_log("Path updated toward player")
+
+	if not nav_agent.is_navigation_finished():
+		var next_pos = nav_agent.get_next_path_position()
+		var dir = (next_pos - global_position).normalized()
+		var target_velocity = dir * speed
+
+		velocity = velocity.move_toward(target_velocity, acceleration * delta)
+		_face_direction_smooth(dir, delta)
+	else:
+		velocity = velocity.move_toward(Vector2.ZERO, deceleration * delta)
+
+	# Try to fire at player if in range
+	if player and is_instance_valid(player):
+		shooter.try_fire_at_target(self, player)
+
+
+func _do_stop(delta):
+	velocity = velocity.move_toward(Vector2.ZERO, deceleration * delta)
+	stop_timer += delta
+
+	if player:
+		var dir = (player.global_position - global_position).normalized()
+		_face_direction_smooth(dir, delta)
+
+	# Shoot at player during stop
+	if player and is_instance_valid(player):
+		shooter.try_fire_at_target(self, player)
+
+	if stop_timer >= stop_duration:
+		stop_timer = 0.0
+		_log("Stop expired")
+
+
+#func _do_retreat(delta):
+	#var to_home = home_position - global_position
+	#if to_home.length() < 20:
+		#return
+#
+	#var dir = to_home.normalized()
+	#var target_velocity = dir * speed * 0.7
+#
+	#velocity = velocity.move_toward(target_velocity, acceleration * delta)
+	#_face_direction_smooth(dir, delta)
 
 func take_damage(amount: int, attacker: Player) -> void:
 	if amount <= 0:
 		return
 
-	player = attacker           # lock onto whoever shot us
-	_aggro = true
-	_state = EnemyState.ENGAGE
-
+	player = attacker 
 	hit_points -= amount
 
-	hurt_sound.play()
-	animation_player.play("take_damage")
+	if hurt_sound:
+		hurt_sound.play()
+
+	if animation_player and animation_player.has_animation("take_damage"):
+		animation_player.play("take_damage")
+
+	_log("DAMAGE: -%d HP -> %d left" % [amount, hit_points])
 
 	if hit_points <= 0:
-		print(name + " (BT enemy) died")
-		queue_free()
+		_die()
+	else:
+		is_aggro = true 
+
+func _die() -> void:
+	_log("DEAD")
+	velocity = Vector2.ZERO
+
+	if animation_player and animation_player.has_animation("death"):
+		animation_player.play("death")
+
+	await get_tree().create_timer(0.5).timeout
+	queue_free()
 
 
-func _on_timer_timeout() -> void:
-	# Keep the NavigationAgent goal refreshed
-	if nav_agent:
-		if _state == EnemyState.ENGAGE and _current_target != Vector2.ZERO:
-			nav_agent.target_position = _current_target
-		elif _state == EnemyState.WANDER and _has_wander_target:
-			nav_agent.target_position = _wander_target
+# UTILITIES
+func _pick_new_wander_target():
+	var angle = randf() * TAU
+	wander_target = home_position + Vector2(cos(angle), sin(angle)) * wander_radius
+	_log("New wander target set")
 
 
-# ======================
-#  Detection Area (same idea as Stage 1)
-# ======================
+func _face_direction_smooth(dir, delta):
+	if dir == Vector2.ZERO:
+		return
+	var target_rot = dir.angle()
+	rotation = lerp_angle(rotation, target_rot, rotation_speed * delta)
 
-func _on_player_detection_body_entered(body: Node2D) -> void:
-	if body is Player and player == null:
-		player = body as Player
-		print(name + " found the player")
+func _draw() -> void:
+	if not show_path:
+		return
 
+	var path = nav_agent.get_current_navigation_path()
+	if path.size() < 2:
+		return
 
-func _on_player_detection_body_exited(body: Node2D) -> void:
-	# If we haven't been shot yet (_aggro == false), losing sight of the
-	# player should drop the target (similar to Stage 1 feel).
-	if body is Player and not _aggro and player != null and body == player:
-		player = null
-		print(name + " lost the player")
+	for i in range(path.size() - 1):
+		draw_line(
+			to_local(path[i]),
+			to_local(path[i + 1]),
+			Color.YELLOW,
+			2.0
+		)
+		
+#LOGGING
+func _log(msg: String) -> void:
+	if debug_ai:
+		print("[EnemyBT %s] %s" % [name, msg])

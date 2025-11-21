@@ -28,10 +28,18 @@ var _cooldown_left: float = 0.0
 @onready var shoot_raycast: RayCast2D = $ShootRayCast
 @onready var shoot_sound: AudioStreamPlayer2D = $ShootSFX
 
+@export var dash_speed: float = 900.0
+@export var dash_duration: float = 0.18
+@export var dash_cooldown: float = 0.60
+@export var dash_action: StringName = &"Dash"   # Change if you used a different action name
+
+var is_dashing: bool = false
+var _dash_time_left: float = 0.0
+var _dash_cooldown_left: float = 0.0
+var _dash_dir: Vector2 = Vector2.ZERO
 
 func _ready() -> void:
 	health = max_health
-
 
 func _process(delta: float) -> void:
 	look_at(get_global_mouse_position())
@@ -40,24 +48,54 @@ func _process(delta: float) -> void:
 		get_tree().quit()
 
 	_cooldown_left = max(0.0, _cooldown_left - delta)
-	if Input.is_action_pressed("shoot") and _cooldown_left <= 0.0:
+	if Input.is_action_just_pressed("shoot") and _cooldown_left <= 0.0:
+	# For rapid fire rate use --> Input.is_action_pressed("shoot") 
 		_fire_bullet()
 		_cooldown_left = shoot_cooldown
 
 	# Handle health regeneration
 	_handle_regen(delta)
 
+func _physics_process(delta: float) -> void:
 
-func _physics_process(_delta: float) -> void:
-	var move_dir: Vector2 = Vector2(
+	# Dash cooldown
+	if _dash_cooldown_left > 0.0:
+		_dash_cooldown_left -= delta
+
+	# Movement input
+	var move_dir := Vector2(
 		Input.get_axis("move_left", "move_right"),
 		Input.get_axis("move_up", "move_down")
 	)
-	if move_dir != Vector2.ZERO:
-		velocity = speed * move_dir.normalized()
+	var input_dir := move_dir.normalized()
+
+	# Dash start
+	if not is_dashing and _dash_cooldown_left <= 0.0 and Input.is_action_just_pressed(dash_action):
+		var dir: Vector2 = input_dir
+		if dir == Vector2.ZERO:
+			dir = (get_global_mouse_position() - global_position).normalized()
+			if dir == Vector2.ZERO:
+				dir = velocity.normalized()
+		if dir != Vector2.ZERO:
+			is_dashing = true
+			_dash_dir = dir
+			_dash_time_left = dash_duration
+			velocity = _dash_dir * dash_speed
+
+	# Dash / normal movement
+	if is_dashing:
+		_dash_time_left -= delta
+		velocity = _dash_dir * dash_speed
+		if _dash_time_left <= 0.0:
+			is_dashing = false
+			_dash_cooldown_left = dash_cooldown
 	else:
-		velocity.x = move_toward(velocity.x, 0, speed)
-		velocity.y = move_toward(velocity.y, 0, speed)
+		if move_dir != Vector2.ZERO:
+			velocity = input_dir * speed
+		else:
+			velocity.x = move_toward(velocity.x, 0, speed)
+			velocity.y = move_toward(velocity.y, 0, speed)
+
 	move_and_slide()
 
 
@@ -88,9 +126,7 @@ func _fire_bullet() -> void:
 		tracer.speed_px_per_sec = tracer_speed_px_per_sec
 		tracer.fade_time = tracer_fade_time
 		tracer.fire(start, end_point)
-	# === END TRACER ===
 
-	# Optional muzzle flash (safe if scene exists)
 	if MUZZLE_SCENE:
 		var flash: Node = MUZZLE_SCENE.instantiate()
 		scene_root.add_child(flash)
@@ -107,7 +143,7 @@ func _fire_bullet() -> void:
 
 func _on_hitbox_body_entered(body: Node2D) -> void:
 	# If any enemy body touches the player's hitbox, the player dies immediately
-	if body is Enemy or body is ExtendedBTEnemy:
+	if body is Enemy or body is EnemyBT or body is ExtendedBTEnemy:
 		died.emit()
 		queue_free()
 

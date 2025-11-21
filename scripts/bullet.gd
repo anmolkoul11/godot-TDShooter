@@ -8,7 +8,7 @@ class_name Bullet
 
 var _dir: Vector2 = Vector2.RIGHT
 var _traveled: float = 0.0
-var _shooter: CharacterBody2D = null  # Player, Enemy, or ExtendedBTEnemy
+var _shooter: CharacterBody2D = null  # Player, Enemy, EnemyBT, or ExtendedBTEnemy
 var _consumed: bool = false           # prevent double-processing in the same frame
 
 @onready var _ray: RayCast2D = $RayCast2D
@@ -90,17 +90,17 @@ func _hit(target: Object) -> void:
 		return
 
 	var shooter_is_player: bool = _shooter is Player
-	var shooter_is_enemy_side: bool = (_shooter is Enemy) or (_shooter is ExtendedBTEnemy)
+	var shooter_is_enemy_side: bool = (_shooter is Enemy) or (_shooter is EnemyBT) or (_shooter is ExtendedBTEnemy)
 
-	# === Player bullets hitting enemies (Enemy or ExtendedBTEnemy) ===
+	# === Player bullets hitting enemies (Enemy, EnemyBT, or ExtendedBTEnemy) ===
 	if shooter_is_player and (
-		(actor is Enemy) or (actor is ExtendedBTEnemy) or
-		(target is Enemy) or (target is ExtendedBTEnemy)
+		(actor is Enemy) or (actor is EnemyBT) or (actor is ExtendedBTEnemy) or
+		(target is Enemy) or (target is EnemyBT) or (target is ExtendedBTEnemy)
 	):
 		var enemy: CharacterBody2D = null
-		if actor is Enemy or actor is ExtendedBTEnemy:
+		if actor is Enemy or actor is EnemyBT or actor is ExtendedBTEnemy:
 			enemy = actor as CharacterBody2D
-		elif target is Enemy or target is ExtendedBTEnemy:
+		elif target is Enemy or target is EnemyBT or target is ExtendedBTEnemy:
 			enemy = target as CharacterBody2D
 
 		if enemy != null:
@@ -112,7 +112,7 @@ func _hit(target: Object) -> void:
 			queue_free()
 			return
 
-	# === Enemy / ExtendedBTEnemy bullets hitting player ===
+	# === Enemy / EnemyBT / ExtendedBTEnemy bullets hitting player ===
 	if shooter_is_enemy_side and ((actor is Player) or (target is Player)):
 		var player: Player = null
 		if actor is Player:
@@ -125,13 +125,13 @@ func _hit(target: Object) -> void:
 				var player_name: String = player.name
 				print("[Bullet] Damaging player: ", player_name)
 
-			# Player.take_damage expects Enemy as 2nd arg:
-			# - If shooter is Enemy → pass it
-			# - If shooter is ExtendedBTEnemy → pass null (allowed for Enemy-typed arg)
+			# Player.take_damage expects CharacterBody2D as 2nd arg
 			if _shooter is Enemy:
 				player.take_damage(damage, _shooter as Enemy)
+			elif _shooter is EnemyBT:
+				player.take_damage(damage, _shooter as EnemyBT)
 			elif _shooter is ExtendedBTEnemy:
-				player.take_damage(damage, null)
+				player.take_damage(damage, _shooter as ExtendedBTEnemy)
 
 			_consumed = true
 			queue_free()
@@ -149,14 +149,14 @@ func _hit(target: Object) -> void:
 
 func _find_actor(target: Object) -> Node:
 	# Direct actors
-	if target is Enemy or target is Player or target is ExtendedBTEnemy:
+	if target is Enemy or target is EnemyBT or target is Player or target is ExtendedBTEnemy:
 		return target as Node
 
 	# Hitbox Areas etc: climb up the parent chain
 	if target is Node:
 		var n: Node = target
 		while n:
-			if n is Enemy or n is Player or n is ExtendedBTEnemy:
+			if n is Enemy or n is EnemyBT or n is Player or n is ExtendedBTEnemy:
 				return n
 			n = n.get_parent()
 

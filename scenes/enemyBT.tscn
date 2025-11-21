@@ -1,11 +1,9 @@
-[gd_scene load_steps=10 format=3 uid="uid://buyxeqalv2e42"]
+[gd_scene load_steps=10 format=3 uid="uid://dieyoo3dq350l"]
 
-[ext_resource type="Script" uid="uid://dhjodku54cs8b" path="res://scripts/enemy.gd" id="1_md0e3"]
-[ext_resource type="Texture2D" uid="uid://c5k6twbdchq0c" path="res://assets/enemy.png" id="2_4ra3w"]
-[ext_resource type="AudioStream" uid="uid://b0unxyv1j12n4" path="res://sfx/slap-hurt-pain-sound-effect-262618.mp3" id="3_4ra3w"]
-[ext_resource type="AudioStream" path="res://sfx/walther-p38-firing-sound-effect-11651.mp3" id="4_shoot"]
-[ext_resource type="Script" path="res://scripts/enemy_shooter.gd" id="5_shooter"]
-
+[ext_resource type="Script" uid="uid://cy8s4rl7nvbse" path="res://scripts/enemy_bt.gd" id="1_stnws"]
+[ext_resource type="Texture2D" uid="uid://cljdgwyw1xe2j" path="res://assets/enemyBT.png" id="2_wkn27"]
+[ext_resource type="AudioStream" uid="uid://b0unxyv1j12n4" path="res://sfx/slap-hurt-pain-sound-effect-262618.mp3" id="3_gm6qo"]
+[ext_resource type="Script" path="res://scripts/enemy_shooter.gd" id="4_shooter"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_7p1mj"]
 radius = 83.0
@@ -51,12 +49,12 @@ _data = {
 &"take_damage": SubResource("Animation_md0e3")
 }
 
-[node name="Enemy" type="CharacterBody2D"]
+[node name="EnemyBT" type="CharacterBody2D"]
 collision_layer = 4
 collision_mask = 9
 motion_mode = 1
 wall_min_slide_angle = 0.0
-script = ExtResource("1_md0e3")
+script = ExtResource("1_stnws")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 modulate = Color(0.8901961, 0, 0, 1)
@@ -65,14 +63,13 @@ shape = SubResource("CapsuleShape2D_7p1mj")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
 position = Vector2(118, 59)
-texture = ExtResource("2_4ra3w")
+texture = ExtResource("2_wkn27")
 
 [node name="PlayerDetection" type="Area2D" parent="."]
 collision_layer = 32
 collision_mask = 2
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="PlayerDetection"]
-visible = false
 position = Vector2(381, 77)
 shape = SubResource("CircleShape2D_7p1mj")
 
@@ -82,7 +79,7 @@ libraries = {
 }
 
 [node name="HurtSound" type="AudioStreamPlayer2D" parent="."]
-stream = ExtResource("3_4ra3w")
+stream = ExtResource("3_gm6qo")
 
 [node name="NavigationAgent2D" type="NavigationAgent2D" parent="."]
 
@@ -90,15 +87,10 @@ stream = ExtResource("3_4ra3w")
 wait_time = 0.3
 autostart = true
 
-[node name="ShootSFX" type="AudioStreamPlayer2D" parent="."]
-stream = ExtResource("4_shoot")
-
 [node name="EnemyShooter" type="Node" parent="."]
-script = ExtResource("5_shooter")
+script = ExtResource("4_shooter")
 fire_range = 800.0
 fire_interval = 0.9
 
-
 [connection signal="body_entered" from="PlayerDetection" to="." method="_on_player_detection_body_entered"]
 [connection signal="body_exited" from="PlayerDetection" to="." method="_on_player_detection_body_exited"]
-

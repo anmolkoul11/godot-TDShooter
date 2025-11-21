@@ -1,8 +1,8 @@
 extends Node2D
 
-const STAGE1_ENEMY_NAMES := ["Enemy", "Enemy2", "Enemy3"]
+const STAGE1_ENEMY_NAMES := ["Enemy", "Enemy1", "Enemy2", "Enemy4(BT)", "Enemy5(BT)"]
 const ENEMY_SCENE := preload("res://scenes/enemy.tscn")
-const BT_ENEMY_SCRIPT := preload("res://scripts/enemy_bt.gd")
+const BT_ENEMY_SCENE := preload("res://scenes/enemy_bt_extended.tscn")
 
 # Stage-2 spawn offsets relative to player
 const BT_SPAWN_OFFSETS := [
@@ -35,9 +35,9 @@ func _ready() -> void:
 	squad_coordinator.player = player
 
 	# Capture visual scale from one of the Stage-1 enemies
-	for name in STAGE1_ENEMY_NAMES:
-		if has_node(name):
-			var e := get_node(name) as Node2D
+	for enemy_name in STAGE1_ENEMY_NAMES:
+		if has_node(enemy_name):
+			var e := get_node(enemy_name) as Node2D
 			_bt_enemy_scale = e.scale
 			break
 
@@ -52,8 +52,8 @@ func _process(_delta: float) -> void:
 
 
 func _are_stage1_enemies_cleared() -> bool:
-	for name in STAGE1_ENEMY_NAMES:
-		if has_node(name):
+	for enemy_name in STAGE1_ENEMY_NAMES:
+		if has_node(enemy_name):
 			return false
 	return true
 
@@ -92,8 +92,7 @@ func _enter_stage2() -> void:
 
 	# IMPORTANT: we do NOT move the player. They stay exactly where Stage 1 ended.
 	for offset in BT_SPAWN_OFFSETS:
-		var enemy := ENEMY_SCENE.instantiate()
-		enemy.set_script(BT_ENEMY_SCRIPT)
+		var enemy := BT_ENEMY_SCENE.instantiate()
 		get_tree().current_scene.add_child(enemy)
 
 		# Same position logic as before – around the player

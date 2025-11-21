@@ -7,9 +7,9 @@ func _run() -> void:
 	# Root Area2D
 	var root := Area2D.new()
 	root.name = "Bullet"
-	# Layer 8 (1 << 7 = 128). Mask = World (1<<0) + Enemy (1<<2) = 1 + 4 = 5
+	# Layer 8 (1 << 7 = 128). Mask = World + Player + Player hitbox + Enemy + Enemy hitbox
 	root.collision_layer = 1 << 7
-	root.collision_mask  = (1 << 0) | (1 << 2)
+	root.collision_mask  = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4)
 
 	# Collision shape (small circle)
 	var col := CollisionShape2D.new()

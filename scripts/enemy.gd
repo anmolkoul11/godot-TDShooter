@@ -7,205 +7,234 @@ const TRACER_SCENE  := preload("res://scenes/tracer.tscn")
 
 @export var speed: float = 150.0
 @export var stop_distance: float = 40.0
-@export var show_path: bool = true
 @export var hit_points: int = 3
-@export var tracer_speed_px_per_sec: float = 7500.0  # enemy tracer slightly slower than player
-@export var tracer_fade_time: float = 0.06           # fade after reaching target
+@export var show_path: bool = true
 
-# Shooting parameters
-@export var shoot_distance: float = 900.0               # Max distance at which the enemy will shoot
-@export var shoot_interval: float = 0.9                 # Seconds between shots
-@export_range(0.0, 1.0) var min_accuracy: float = 0.4   # 40%
-@export_range(0.0, 1.0) var max_accuracy: float = 0.8   # 80%
+# FSM params
+@export var wander_radius: float = 400.0
+@export var wander_interval: float = 2.5         # How often to pick a new wander point
+@export var path_refresh_interval: float = 0.35   # How often to refresh chase path
+@export var stop_duration: float = 2.0            # Stop state duration
 
-var direction: Vector2 = Vector2.ZERO
+# Motion smoothing
+@export var rotation_speed: float = 8.0           # Radians per second for smooth rotation
+@export var acceleration: float = 800.0            # Pixels per second squared
+@export var deceleration: float = 1200.0          # Pixels per second squared (for stopping)
+
+@export var debug_ai: bool = true
+
+enum State { IDLE, CHASE, STOP, RETREAT, DEAD }
+var state: State = State.IDLE
+
 var player: Player = null
+var home_position: Vector2
+var wander_target: Vector2
+var wander_timer: float = 0.0
+var path_timer: float = 0.0
+var stop_timer: float = 0.0
 
+@onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
 @onready var animation_player: AnimationPlayer = $AnimationPlayer
 @onready var hurt_sound: AudioStreamPlayer2D = $HurtSound
-@onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
-@onready var _timer: Timer = $Timer
-@onready var shoot_timer: Timer = $ShootTimer
-@onready var shoot_sound: AudioStreamPlayer2D = $ShootSFX
+@onready var shooter: Node = $EnemyShooter
 
 func _ready() -> void:
-	# Path update timer
-	if not _timer.timeout.is_connected(_on_timer_timeout):
-		_timer.timeout.connect(_on_timer_timeout)
-
-	# Shooting timer
-	if shoot_timer:
-		shoot_timer.wait_time = shoot_interval
-		if not shoot_timer.timeout.is_connected(_on_shoot_timer_timeout):
-			shoot_timer.timeout.connect(_on_shoot_timer_timeout)
-		shoot_timer.start()
-
-	# Obstacle avoidance / nav tuning
-	nav_agent.path_desired_distance = 30.0
-	nav_agent.target_desired_distance = 30.0
-	nav_agent.radius = 40.0
-	nav_agent.max_speed = speed
-	nav_agent.avoidance_enabled = true
-	nav_agent.avoidance_layers = 1
-	nav_agent.avoidance_mask = 1
-
-	# Quieter than player’s gunshot
-	if shoot_sound:
-		shoot_sound.volume_db = -6.0  # ~half perceived loudness
+	home_position = global_position
+	nav_agent.path_desired_distance = 20
+	nav_agent.target_desired_distance = 20
+	nav_agent.radius = 30
+	nav_agent.avoidance_enabled = false
+	_pick_new_wander_target()
+	_log("READY -> IDLE")
 
 func _process(_delta: float) -> void:
-	if player != null:
-		if is_instance_valid(player):
-			look_at(player.global_position)
-		else:
-			player = null
-
-func _physics_process(_delta: float) -> void:
-	if player != null and not is_instance_valid(player):
-		player = null
-
-	if player != null:
-		if nav_agent.is_navigation_finished():
-			velocity = Vector2.ZERO
-			move_and_slide()
-			if show_path:
-				queue_redraw()
-			return
-
-		var next_position: Vector2 = nav_agent.get_next_path_position()
-		var dir: Vector2 = (next_position - global_position).normalized()
-		var distance_to_player := global_position.distance_to(player.global_position)
-
-		if distance_to_player > stop_distance:
-			var desired_velocity := dir * speed
-			nav_agent.set_velocity(desired_velocity)
-			velocity = desired_velocity
-		else:
-			velocity = Vector2.ZERO
-			nav_agent.set_velocity(Vector2.ZERO)
-
-		move_and_slide()
-
 	if show_path:
 		queue_redraw()
 
-func _draw() -> void:
-	if not show_path or player == null:
+func _physics_process(delta: float) -> void:
+	match state:
+		State.DEAD:
+			velocity = Vector2.ZERO
+		State.IDLE:
+			_do_idle(delta)
+		State.CHASE:
+			_do_chase(delta)
+		State.STOP:
+			_do_stop(delta)
+		State.RETREAT:
+			_do_retreat(delta)
+	move_and_slide()
+
+# ---------------- STATES ----------------
+
+func _do_idle(delta: float) -> void:
+	wander_timer += delta
+	var to_target = wander_target - global_position
+	if to_target.length() < 10 or wander_timer >= wander_interval:
+		_pick_new_wander_target()
+		wander_timer = 0.0
+	var dir = to_target.normalized()
+	var target_velocity = dir * speed * 0.55
+	velocity = velocity.move_toward(target_velocity, acceleration * delta)
+	_face_direction_smooth(dir, delta)
+	# Transition on detection
+	if player:
+		_change_state(State.CHASE)
+
+func _do_chase(delta: float) -> void:
+	if not player:
+		_change_state(State.IDLE)
 		return
-
-	var path: PackedVector2Array = nav_agent.get_current_navigation_path()
-
-	if path.size() > 1:
-		for i in range(path.size() - 1):
-			var start := to_local(path[i])
-			var end := to_local(path[i + 1])
-			draw_line(start, end, Color.YELLOW, 3.0)
-
-		for point in path:
-			var local_point := to_local(point)
-			draw_circle(local_point, 8, Color.ORANGE)
-
-		if not nav_agent.is_navigation_finished():
-			var next_pos := to_local(nav_agent.get_next_path_position())
-			draw_circle(next_pos, 12, Color.RED)
-
-		var target_local := to_local(nav_agent.target_position)
-		draw_circle(target_local, 15, Color.GREEN)
-
-func makepath() -> void:
-	if player != null and is_instance_valid(player):
+	path_timer += delta
+	# Refresh path
+	if path_timer >= path_refresh_interval or nav_agent.is_navigation_finished():
 		nav_agent.target_position = player.global_position
+		path_timer = 0.0
+	# Move along path
+	if not nav_agent.is_navigation_finished():
+		var next_pos = nav_agent.get_next_path_position()
+		var dir = (next_pos - global_position).normalized()
+		var target_velocity = dir * speed
+		velocity = velocity.move_toward(target_velocity, acceleration * delta)
+		_face_direction_smooth(dir, delta)
+	else:
+		velocity = velocity.move_toward(Vector2.ZERO, deceleration * delta)
+	# Try to fire at player if in range
+	if player and is_instance_valid(player):
+		shooter.try_fire_at_target(self, player)
+	# Stop distance -> STOP state
+	if global_position.distance_to(player.global_position) <= stop_distance:
+		_change_state(State.STOP)
 
-func _on_player_detection_body_entered(body: Node2D) -> void:
-	if body is Player and player == null:
-		player = body
-		print(name + " found the player")
+func _do_stop(delta: float) -> void:
+	velocity = velocity.move_toward(Vector2.ZERO, deceleration * delta)
+	stop_timer += delta
+	# Face player if present, else face last wander target
+	if player:
+		var dir = (player.global_position - global_position).normalized()
+		_face_direction_smooth(dir, delta)
+	# Shoot at player during stop
+	if player and is_instance_valid(player):
+		shooter.try_fire_at_target(self, player)
+	if stop_timer >= stop_duration:
+		# After stop: if player still near, re-enter CHASE; else RETREAT back home
+		if player and global_position.distance_to(player.global_position) > stop_distance:
+			_change_state(State.CHASE)
+		else:
+			_change_state(State.RETREAT)
 
-func _on_player_detection_body_exited(body: Node2D) -> void:
-	if body is Player and player != null:
-		player = null
-		print(name + " lost the player")
+func _do_retreat(delta: float) -> void:
+	var to_home = home_position - global_position
+	if to_home.length() < 20:
+		# Reached home, transition to IDLE
+		_change_state(State.IDLE)
+		return
+	# Move toward home
+	var dir = to_home.normalized()
+	var target_velocity = dir * speed * 0.7
+	velocity = velocity.move_toward(target_velocity, acceleration * delta)
+	_face_direction_smooth(dir, delta)
+	# If player re-enters detection, immediately chase again
+	if player:
+		_change_state(State.CHASE)
+
+# ---------------- EVENTS ----------------
 
 func take_damage(amount: int, attacker: Player) -> void:
-	if amount <= 0:
+	if state == State.DEAD or amount <= 0:
 		return
-
-	player = attacker  # Aggro the shooter
+	player = attacker
 	hit_points -= amount
-
 	hurt_sound.play()
-	animation_player.play("take_damage")
-
+	if animation_player.has_animation("take_damage"):
+		animation_player.play("take_damage")
+	_log("DAMAGE -> %d HP left" % hit_points)
 	if hit_points <= 0:
-		print(name + " died")
-		queue_free()
-
-func _on_timer_timeout() -> void:
-	makepath()
-
-# ===== SHOOTING =====
-
-func _on_shoot_timer_timeout() -> void:
-	_shoot_at_player()
-
-func _shoot_at_player() -> void:
-	if player == null or not is_instance_valid(player):
-		return
-
-	var start := global_position
-	var distance_to_player := start.distance_to(player.global_position)
-	if distance_to_player > shoot_distance:
-		return
-
-	# Aim towards player
-	var dir := (player.global_position - start).normalized()
-
-	# Choose an accuracy in [min_accuracy, max_accuracy]
-	var accuracy := randf_range(min_accuracy, max_accuracy)
-
-	# With probability (1 - accuracy) we intentionally miss by rotating the aim
-	if randf() > accuracy:
-		var miss_angle_deg := randf_range(-25.0, 25.0)
-		dir = dir.rotated(deg_to_rad(miss_angle_deg))
-
-	var scene_root := get_tree().get_current_scene()
-
-	# === BULLET (same pattern as player) ===
-	var bullet: Bullet = BULLET_SCENE.instantiate()
-	var bullets_node := scene_root.get_node_or_null("Bullets")
-	if bullets_node:
-		bullets_node.add_child(bullet)
+		_die()
 	else:
-		scene_root.add_child(bullet)
+		_change_state(State.CHASE)
 
-	bullet.setup(self, start, dir)
+func _die() -> void:
+	state = State.DEAD
+	velocity = Vector2.ZERO
+	if animation_player.has_animation("dead"):
+		animation_player.play("dead")
+	_log("DEAD")
+	queue_free()
 
-	# === TRACER (uses the same Tracer scene as player) ===
-	if TRACER_SCENE:
-		# Raycast to actual hit point so tracer length matches reality
-		var max_range := 1200.0
-		var to := start + dir * max_range
-		var space_state := get_world_2d().direct_space_state
-		var query := PhysicsRayQueryParameters2D.create(start, to)
-		# Collide with world (layer 1) and player (layer 2)
-		query.collision_mask = (1 << 0) | (1 << 1)
-		var res := space_state.intersect_ray(query)
-		var end_point: Vector2 = (res.get("position", to)) as Vector2
+# Connected to PlayerDetection Area2D signals
+func _on_player_detection_body_entered(body: Node) -> void:
+	if body is Player:
+		player = body
+		_log("DETECTION ENTER")
+		if state != State.DEAD:
+			_change_state(State.CHASE)
 
-		var tracer: Tracer = TRACER_SCENE.instantiate()
-		scene_root.add_child(tracer)
-		tracer.speed_px_per_sec = tracer_speed_px_per_sec
-		tracer.fade_time = tracer_fade_time
-		tracer.fire_colored(start, end_point, Color(1, 0, 0, 1))  # bright red
+func _on_player_detection_body_exited(body: Node) -> void:
+	if body is Player and body == player:
+		player = null
+		_log("DETECTION EXIT")
+		if state == State.CHASE:
+			_change_state(State.STOP)
 
-	# === MUZZLE FLASH (same as player) ===
-	if MUZZLE_SCENE:
-		var flash: MuzzleFlash = MUZZLE_SCENE.instantiate()
-		scene_root.add_child(flash)
-		flash.fire_at(start, dir.angle())
+# ---------------- HELPERS ----------------
 
-	# Quieter firing sound
-	if shoot_sound:
-		shoot_sound.play()
+func _pick_new_wander_target() -> void:
+	var rand_dir = Vector2(randf() * 2 - 1, randf() * 2 - 1).normalized()
+	var radius = randf() * wander_radius
+	wander_target = home_position + rand_dir * radius
+	_log("NEW WANDER TARGET %s" % wander_target)
 
-	print("%s fired at player with accuracy %.2f" % [name, accuracy])
+func _change_state(new_state: State) -> void:
+	if state == new_state:
+		return
+	state = new_state
+	match state:
+		State.IDLE:
+			wander_timer = 0.0
+			_pick_new_wander_target()
+		State.CHASE:
+			path_timer = 0.0
+			if player:
+				nav_agent.target_position = player.global_position
+		State.STOP:
+			stop_timer = 0.0
+		State.RETREAT:
+			path_timer = 0.0
+		State.DEAD:
+			pass
+	_log("STATE -> %s" % _state_name(state))
+
+func _state_name(s: State) -> String:
+	match s:
+		State.IDLE: return "IDLE"
+		State.CHASE: return "CHASE"
+		State.STOP: return "STOP"
+		State.RETREAT: return "RETREAT"
+		State.DEAD: return "DEAD"
+	return "?"
+
+func _face_direction(dir: Vector2) -> void:
+	if dir.length() > 0.001:
+		rotation = dir.angle()
+
+func _face_direction_smooth(dir: Vector2, delta: float) -> void:
+	if dir.length() > 0.001:
+		var target_angle = dir.angle()
+		var angle_diff = angle_difference(rotation, target_angle)
+		var max_rotation = rotation_speed * delta
+		if abs(angle_diff) < max_rotation:
+			rotation = target_angle
+		else:
+			rotation += sign(angle_diff) * max_rotation
+
+func _draw() -> void:
+	if not show_path:
+		return
+	var path = nav_agent.get_current_navigation_path()
+	for i in range(path.size() - 1):
+		draw_line(to_local(path[i]), to_local(path[i + 1]), Color.YELLOW, 2.0)
+
+func _log(msg: String) -> void:
+	if debug_ai:
+		print("[Enemy %s] %s" % [name, msg])
