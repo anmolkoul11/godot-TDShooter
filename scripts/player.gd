@@ -5,7 +5,7 @@ signal died
 
 var speed: float = 300.0
 
-@export var max_health: int = 3
+@export var max_health: int = 4
 
 # Health regen settings
 @export var regen_delay: float = 5.0        # wait 5 seconds after damage
@@ -14,6 +14,9 @@ var speed: float = 300.0
 var health: int
 var _time_since_damage: float = 0.0
 var _regen_accum: float = 0.0
+
+var infinite_health: bool = false  # Toggle with H key
+var _h_key_pressed: bool = false   # Track H key state
 
 const BULLET_SCENE  := preload("res://scenes/bullet.tscn")
 const MUZZLE_SCENE  := preload("res://scenes/muzzle_flash.tscn") # ok if missing
@@ -27,6 +30,8 @@ var _cooldown_left: float = 0.0
 @onready var camera_remote_transform: RemoteTransform2D = $CamRemoteTransform
 @onready var shoot_raycast: RayCast2D = $ShootRayCast
 @onready var shoot_sound: AudioStreamPlayer2D = $ShootSFX
+@onready var health_bar: ProgressBar = $HealthBarContainer/HealthBar
+@onready var stamina_bar: ProgressBar = $HealthBarContainer/StaminaBar
 
 @export var dash_speed: float = 900.0
 @export var dash_duration: float = 0.18
@@ -40,12 +45,23 @@ var _dash_dir: Vector2 = Vector2.ZERO
 
 func _ready() -> void:
 	health = max_health
+	if health_bar:
+		health_bar.max_value = max_health
+		health_bar.value = health
 
 func _process(delta: float) -> void:
 	look_at(get_global_mouse_position())
 
 	if Input.is_action_just_pressed("quit_game"):
 		get_tree().quit()
+
+	# Toggle infinite health with U key
+	if Input.is_key_pressed(KEY_U) and not _h_key_pressed:
+		infinite_health = !infinite_health
+		_h_key_pressed = true
+		print("Infinite health: %s" % ("ON" if infinite_health else "OFF"))
+	elif not Input.is_key_pressed(KEY_U):
+		_h_key_pressed = false
 
 	_cooldown_left = max(0.0, _cooldown_left - delta)
 	if Input.is_action_just_pressed("shoot") and _cooldown_left <= 0.0:
@@ -97,6 +113,11 @@ func _physics_process(delta: float) -> void:
 			velocity.y = move_toward(velocity.y, 0, speed)
 
 	move_and_slide()
+	
+	# Update stamina bar based on dash cooldown
+	if stamina_bar:
+		var stamina_ratio = 1.0 - (_dash_cooldown_left / dash_cooldown)
+		stamina_bar.value = stamina_ratio
 
 
 func _fire_bullet() -> void:
@@ -170,6 +191,7 @@ func _handle_regen(delta: float) -> void:
 		health += 1
 		_regen_accum -= 1.0
 		print("Player regenerated to health = %d" % health)
+		_update_health_bar()
 
 	# Stop when full
 	if health >= max_health:
@@ -181,12 +203,19 @@ func take_damage(amount: int, attacker: CharacterBody2D = null) -> void:
 	if amount <= 0:
 		return
 
+	# If infinite health is enabled, take no damage
+	if infinite_health:
+		return
+
 	health -= amount
 
 	var attacker_name: String = "Unknown"
 	if attacker != null:
 		attacker_name = attacker.name
 	print("Player hit by %s, health = %d" % [attacker_name, health])
+
+	# Update health bar
+	_update_health_bar()
 
 	# Reset regen timer and accumulator on hit
 	_time_since_damage = 0.0
@@ -195,3 +224,8 @@ func take_damage(amount: int, attacker: CharacterBody2D = null) -> void:
 	if health <= 0:
 		died.emit()
 		queue_free()
+
+
+func _update_health_bar() -> void:
+	if health_bar:
+		health_bar.value = max(0, health)

@@ -3,6 +3,7 @@ extends Node2D
 const STAGE1_ENEMY_NAMES := ["Enemy", "Enemy1", "Enemy2", "Enemy4(BT)", "Enemy5(BT)"]
 const ENEMY_SCENE := preload("res://scenes/enemy.tscn")
 const BT_ENEMY_SCENE := preload("res://scenes/enemy_bt_extended.tscn")
+const DEBUG_MANAGER_SCRIPT := preload("res://scripts/debug_manager.gd")
 
 # Stage-2 spawn offsets relative to player
 const BT_SPAWN_OFFSETS := [
@@ -10,6 +11,8 @@ const BT_SPAWN_OFFSETS := [
 	Vector2(700, -400),
 	Vector2(-700, 400),
 	Vector2(700, 400),
+	Vector2(0, -600),
+	Vector2(0, 600),
 ]
 
 @onready var player: Player = $Player
@@ -33,6 +36,12 @@ func _ready() -> void:
 	squad_coordinator.name = "SquadCoordinator"
 	add_child(squad_coordinator)
 	squad_coordinator.player = player
+	
+	# Create and add debug manager for visualization
+	var debug_manager = Node.new()
+	debug_manager.set_script(DEBUG_MANAGER_SCRIPT)
+	debug_manager.name = "DebugManager"
+	add_child(debug_manager)
 
 	# Capture visual scale from one of the Stage-1 enemies
 	for enemy_name in STAGE1_ENEMY_NAMES:
