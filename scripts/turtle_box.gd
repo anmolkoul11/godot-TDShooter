@@ -50,5 +50,4 @@ func _on_pickup_zone_body_entered(body: Node2D) -> void:
 	if turtle == null or turtle.is_carried:
 		return
 
-	turtle.pick_up(body)
-	# Level-end logic is still handled by world_scene.gd via turtle.picked_up
+	turtle.call_deferred("pick_up", body)

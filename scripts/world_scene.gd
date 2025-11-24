@@ -134,10 +134,10 @@ func _enter_stage2() -> void:
 	_in_stage2 = true
 	print("Stage 2 started: cleaning Stage 1 enemies, spawning BT enemies + safe zone")
 
-	# Check if player is still valid (might have been killed by enemy contact)
-	if not is_instance_valid(player):
-		print("Player was killed during stage transition!")
-		return
+	## Check if player is still valid (might have been killed by enemy contact)
+	#if not is_instance_valid(player):
+		#print("Player was killed during stage transition!")
+		#return
 
 	# 1) REMOVE ANY REMAINING STAGE-1 ENEMIES
 	for enemy_name in STAGE1_ENEMY_NAMES:
@@ -179,7 +179,7 @@ func _spawn_safe_zone() -> void:
 	_safe_zone.global_position = Vector2(-500, -100)
 
 	# Set scale
-	_safe_zone.scale = Vector2(0.2, 0.2)
+	_safe_zone.scale = Vector2(0.3, 0.3)
 
 	_safe_zone.turtle_delivered.connect(_on_turtle_delivered)
 
@@ -191,14 +191,14 @@ func _on_turtle_delivered() -> void:
 
 	if _turtle and _turtle.is_carried:
 		# Drop turtle at safe zone center
-		_turtle.drop_to(_safe_zone, Vector2.ZERO)
+		_turtle.call_deferred("drop_to", _safe_zone,  Vector2(100,0))
 
 		# Smooth scale up (celebration / rescue animation)
 		var tween := create_tween()
 		tween.tween_property(
 			_turtle,
 			"scale",
-			Vector2(5, 5),
+			Vector2(3, 3),
 			0.4
 		).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
@@ -206,7 +206,6 @@ func _on_turtle_delivered() -> void:
 	get_tree().create_timer(2.0).timeout.connect(func():
 		get_tree().reload_current_scene()
 	)
-
 
 func _on_player_died() -> void:
 	print("game over!")

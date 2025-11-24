@@ -27,4 +27,5 @@ position = Vector2(14.9999695, 7)
 shape = SubResource("RectangleShape2D_70rre")
 
 [node name="Turtle" parent="." instance=ExtResource("2_gc6uk")]
-scale = Vector2(2.5, 2.5)
+position = Vector2(70, 35)
+scale = Vector2(2, 2)
