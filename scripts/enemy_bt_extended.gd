@@ -35,6 +35,9 @@ var _has_wander_target: bool = false
 var _wander_timer: float = 0.0
 
 var _current_target: Vector2 = Vector2.ZERO
+var _flank_reached: bool = false              # Has this enemy reached its flank position?
+var _close_in_timer: float = 0.0              # Timer for slow close-in movement
+var _squad_index: int = -1                    # Index in squad for determining role
 
 const BULLET_SCENE := preload("res://scenes/bullet.tscn")
 const MUZZLE_SCENE := preload("res://scenes/muzzle_flash.tscn")
@@ -71,6 +74,7 @@ func _ready() -> void:
 	if root and root.has_node("SquadCoordinator"):
 		squad = root.get_node("SquadCoordinator") as SquadCoordinator
 		squad.register_enemy(self)
+		_squad_index = squad.enemies.find(self)
 
 	# IMPORTANT: we do NOT set `player` here.
 	# `player` will be assigned only when:
@@ -142,9 +146,28 @@ func _state_engage() -> void:
 	if player == null or not is_instance_valid(player):
 		return
 
-	# Use flanking from the SquadCoordinator if available; otherwise just chase
-	if squad:
-		_current_target = squad.get_flank_target_position(self, flank_radius)
+	# Determine if this is the front enemy (slot 0)
+	var is_front_enemy: bool = (_squad_index >= 0 and _squad_index % 4 == 0)
+
+	# If front enemy, chase player directly
+	if is_front_enemy:
+		_current_target = player.global_position
+	# Otherwise, use flanking position
+	elif squad:
+		var flank_pos = squad.get_flank_target_position(self, flank_radius)
+		var dist_to_flank = global_position.distance_to(flank_pos)
+		
+		# Once close to flank position, start moving closer to player
+		if dist_to_flank < stop_distance * 2.0:
+			_flank_reached = true
+		
+		# If reached flank, slowly move closer to player
+		if _flank_reached:
+			_close_in_timer += get_physics_process_delta_time()
+			var close_in_speed = speed * 0.15  # Very slow close-in
+			_current_target = player.global_position.move_toward(flank_pos, close_in_speed * _close_in_timer)
+		else:
+			_current_target = flank_pos
 	else:
 		_current_target = player.global_position
 
@@ -259,6 +282,15 @@ func _on_player_detection_body_exited(body: Node2D) -> void:
 	if body is Player and not _aggro and player != null and body == player:
 		player = null
 		print(name + " lost the player")
+
+
+func _on_hitbox_area_entered(area: Area2D) -> void:
+	# If enemy touches player hitbox, player dies
+	if area.is_in_group("player_hitbox") or area.name == "Hitbox":
+		var player_node = area.get_parent()
+		if player_node is Player:
+			player_node.died.emit()
+			player_node.queue_free()
 
 
 # ======================

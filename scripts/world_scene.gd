@@ -99,6 +99,11 @@ func _enter_stage2() -> void:
 	_in_stage2 = true
 	print("Stage 2 started: spawning BT enemies")
 
+	# Check if player is still valid (might have been killed by enemy contact)
+	if not is_instance_valid(player):
+		print("Player was killed during stage transition!")
+		return
+
 	# IMPORTANT: we do NOT move the player. They stay exactly where Stage 1 ended.
 	for offset in BT_SPAWN_OFFSETS:
 		var enemy := BT_ENEMY_SCENE.instantiate()
