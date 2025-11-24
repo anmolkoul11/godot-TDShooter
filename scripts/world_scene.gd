@@ -3,6 +3,7 @@ extends Node2D
 const STAGE1_ENEMY_NAMES := ["Enemy", "Enemy1", "Enemy2", "Enemy4(BT)", "Enemy5(BT)"]
 const ENEMY_SCENE := preload("res://scenes/enemy.tscn")
 const BT_ENEMY_SCENE := preload("res://scenes/enemy_bt_extended.tscn")
+const DEBUG_MANAGER_SCRIPT := preload("res://scripts/debug_manager.gd")
 const TURTLE_BOX_SCENE := preload("res://scenes/turtle_box.tscn")
 const SAFE_ZONE_SCENE := preload("res://scenes/safe_zone.tscn")
 
@@ -12,6 +13,8 @@ const BT_SPAWN_OFFSETS := [
 	Vector2(700, -400),
 	Vector2(-700, 400),
 	Vector2(700, 400),
+	Vector2(0, -600),
+	Vector2(0, 600),
 ]
 
 @onready var player: Player = $Player
@@ -39,6 +42,12 @@ func _ready() -> void:
 	squad_coordinator.name = "SquadCoordinator"
 	add_child(squad_coordinator)
 	squad_coordinator.player = player
+	
+	# Create and add debug manager for visualization
+	var debug_manager = Node.new()
+	debug_manager.set_script(DEBUG_MANAGER_SCRIPT)
+	debug_manager.name = "DebugManager"
+	add_child(debug_manager)
 
 	# Capture visual scale from one of the Stage-1 enemies
 	for enemy_name in STAGE1_ENEMY_NAMES:
@@ -124,6 +133,11 @@ func _start_stage2_transition() -> void:
 func _enter_stage2() -> void:
 	_in_stage2 = true
 	print("Stage 2 started: cleaning Stage 1 enemies, spawning BT enemies + safe zone")
+
+	# Check if player is still valid (might have been killed by enemy contact)
+	if not is_instance_valid(player):
+		print("Player was killed during stage transition!")
+		return
 
 	# 1) REMOVE ANY REMAINING STAGE-1 ENEMIES
 	for enemy_name in STAGE1_ENEMY_NAMES:

@@ -44,12 +44,23 @@ func get_flank_target_position(enemy: Node, flank_radius: float) -> Vector2:
 	if index == -1:
 		index = 0
 
-	var offsets: Array[Vector2] = [
-		dir,
-		dir.rotated(-PI / 2.0),
-		dir.rotated(PI / 2.0),
-		-dir,
+	# Base 4 cardinal directions
+	var base_offsets: Array[Vector2] = [
+		dir,                          # Front
+		dir.rotated(-PI / 2.0),       # Left
+		dir.rotated(PI / 2.0),        # Right
+		-dir,                         # Back
 	]
 
-	var slot := offsets[index % offsets.size()]
-	return player.global_position - slot * flank_radius
+	# Determine which slot and layer this enemy should occupy
+	var slot_index := index % 4                    # Which cardinal direction (0-3)
+	var layer := int(index / 4.0)                  # Which layer (0=closest, 1=next ring, etc)
+	
+	# First 4 enemies: inner ring at base flank_radius
+	# Next 4 enemies: outer ring at 1.5x flank_radius
+	# Next 4 enemies: outer ring at 2x flank_radius, etc
+	var distance_multiplier: float = 1.0 + (float(layer) * 0.5)
+	var adjusted_radius: float = flank_radius * distance_multiplier
+	
+	var slot := base_offsets[slot_index]
+	return player.global_position - slot * adjusted_radius
