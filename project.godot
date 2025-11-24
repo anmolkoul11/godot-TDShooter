@@ -15,11 +15,19 @@ run/main_scene="uid://c26ytx1m2b0sm"
 config/features=PackedStringArray("4.5", "Forward Plus")
 config/icon="res://icon.svg"
 
+[autoload]
+
+Globals="*res://globals.gd"
+
 [display]
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/scale=0.7
+
+[editor]
+
+version_control/autoload_on_startup=true
 
 [input]
 

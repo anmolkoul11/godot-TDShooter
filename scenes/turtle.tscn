@@ -1,0 +1,20 @@
+[gd_scene load_steps=4 format=3 uid="uid://citlsxwq7a54m"]
+
+[ext_resource type="Script" path="res://scripts/turtle.gd" id="1_1l2iw"]
+[ext_resource type="Texture2D" uid="uid://cs0wp5pnrhfis" path="res://assets/turtle.png" id="2_1l2iw"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_1l2iw"]
+
+[node name="Turtle" type="Area2D"]
+scale = Vector2(0.5, 0.5)
+collision_layer = 3
+collision_mask = 3
+script = ExtResource("1_1l2iw")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+position = Vector2(-25, -25.6875)
+scale = Vector2(0.2109375, 0.19335721)
+texture = ExtResource("2_1l2iw")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_1l2iw")

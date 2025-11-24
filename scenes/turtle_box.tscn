@@ -1,0 +1,31 @@
+[gd_scene load_steps=6 format=3 uid="uid://vf60mw01i1u7"]
+
+[ext_resource type="Script" uid="uid://bmcux8he7od45" path="res://scripts/turtle_box.gd" id="1_gc6uk"]
+[ext_resource type="Texture2D" uid="uid://btg8vnycq5clp" path="res://assets/RTS_Crate.png" id="1_o6kma"]
+[ext_resource type="PackedScene" uid="uid://citlsxwq7a54m" path="res://scenes/turtle.tscn" id="2_gc6uk"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_oxw14"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_70rre"]
+
+[node name="TurtleBox" type="StaticBody2D"]
+scale = Vector2(0.2, 0.2)
+script = ExtResource("1_gc6uk")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("1_o6kma")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_oxw14")
+
+[node name="TurtlePickupZone" type="Area2D" parent="."]
+position = Vector2(0, -7)
+collision_mask = 3
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="TurtlePickupZone"]
+position = Vector2(14.9999695, 7)
+shape = SubResource("RectangleShape2D_70rre")
+
+[node name="Turtle" parent="." instance=ExtResource("2_gc6uk")]
+position = Vector2(70, 35)
+scale = Vector2(2, 2)
