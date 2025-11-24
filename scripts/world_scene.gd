@@ -31,9 +31,11 @@ var _bt_enemy_scale: Vector2 = Vector2.ONE
 var _turtle: Turtle = null
 var _turtle_box: TurtleBox = null
 var _safe_zone: SafeZone = null
+var _scene_path: String = ""  # Store scene path for reloading
 
 
 func _ready() -> void:
+	_scene_path = scene_file_path
 	player.died.connect(_on_player_died)
 	player.camera_remote_transform.remote_path = main_camera.get_path()
 
@@ -204,9 +206,11 @@ func _on_turtle_delivered() -> void:
 
 	# Delay, then restart or move to next scene
 	get_tree().create_timer(2.0).timeout.connect(func():
-		get_tree().reload_current_scene()
+		get_tree().change_scene_to_file(get_tree().current_scene.scene_file_path)
 	)
 
 func _on_player_died() -> void:
 	print("game over!")
-	get_tree().create_timer(3.0).timeout.connect(get_tree().reload_current_scene)
+	get_tree().create_timer(3.0).timeout.connect(func():
+		get_tree().change_scene_to_file(get_tree().current_scene.scene_file_path)
+	)
