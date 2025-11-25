@@ -206,6 +206,7 @@ func _state_engage() -> void:
 			_flank_reached = true
 		
 		if _flank_reached:
+			PerformanceMetrics.on_flank_attempt()
 			_close_in_timer += get_physics_process_delta_time()
 			var close_in_speed = speed * 0.15
 			_current_target = player.global_position.move_toward(flank_pos, close_in_speed * _close_in_timer)
@@ -262,6 +263,7 @@ func _state_taking_cover() -> void:
 		
 		if dist_to_cover < stop_distance:
 			_in_cover = true
+			PerformanceMetrics.on_cover_entered()
 			velocity = Vector2.ZERO
 			if nav_agent:
 				nav_agent.set_velocity(Vector2.ZERO)
@@ -298,6 +300,8 @@ func _state_taking_cover() -> void:
 
 
 func _state_retreating() -> void:
+	PerformanceMetrics.on_retreat()
+
 	if player == null or not is_instance_valid(player):
 		return
 
@@ -431,6 +435,7 @@ func take_damage(amount: int, attacker: Player) -> void:
 	_dash_to_cover()
 
 	if hit_points <= 0:
+		PerformanceMetrics.on_enemy_killed("EXT")
 		print(name + " (BT enemy) died")
 		queue_free()
 
@@ -438,6 +443,22 @@ func take_damage(amount: int, attacker: Player) -> void:
 # ======================
 #  Bullet checks – now also only dash-to-cover
 # ======================
+
+func _try_dodge() -> void:
+	# Only dodge if cooldown is available and random chance succeeds
+	if _dash_cooldown_left <= 0.0 and randf() < _actual_dodge_chance:
+		# Pick a random perpendicular direction to move away from player
+		var to_player = (player.global_position - global_position).normalized()
+		var dodge_dir = to_player.rotated(randf_range(-PI / 2.0, PI / 2.0)).normalized()
+		
+		# Start dash
+		is_dashing = true
+		_dash_dir = dodge_dir
+		_dash_time_left = dash_duration
+		velocity = _dash_dir * dash_speed
+		
+		print(name + " dodged!")
+		PerformanceMetrics.on_dodge()
 
 func _check_for_incoming_bullets() -> void:
 	var bullets = get_tree().get_nodes_in_group("bullets")
@@ -457,6 +478,9 @@ func _check_for_incoming_bullets() -> void:
 		if bullet_velocity.normalized().dot(to_bullet) > 0.5:
 			_dash_to_cover()
 			return   # only try once per frame
+		print(name + " predicted dodge!")
+		PerformanceMetrics.on_dodge()
+
 
 
 func _on_timer_timeout() -> void:

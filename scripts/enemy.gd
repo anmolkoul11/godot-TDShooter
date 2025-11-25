@@ -160,6 +160,7 @@ func _die() -> void:
 	if animation_player.has_animation("dead"):
 		animation_player.play("dead")
 	_log("DEAD")
+	PerformanceMetrics.on_enemy_killed("FSM")
 	queue_free()
 
 # Connected to PlayerDetection Area2D signals

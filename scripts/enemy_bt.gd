@@ -22,7 +22,7 @@ const TRACER_SCENE := preload("res://scenes/tracer.tscn")
 @export var detection_radius: float = 500.0
 @export var fire_range: float = 800.0             # Max range to shoot player
 @export var fire_interval: float = 0.9            # Interval between shots (seconds)
-@export var debug_ai: bool = true
+@export var debug_ai: bool = false
 
 var player: Player = null
 var home_position: Vector2
@@ -266,6 +266,8 @@ func _die() -> void:
 		animation_player.play("death")
 
 	await get_tree().create_timer(0.5).timeout
+	PerformanceMetrics.on_enemy_killed("BT")
+
 	queue_free()
 
 

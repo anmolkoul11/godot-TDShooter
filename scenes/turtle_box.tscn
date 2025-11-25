@@ -9,7 +9,7 @@
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_70rre"]
 
 [node name="TurtleBox" type="StaticBody2D"]
-scale = Vector2(0.2, 0.2)
+scale = Vector2(0.15, 0.15)
 script = ExtResource("1_gc6uk")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
