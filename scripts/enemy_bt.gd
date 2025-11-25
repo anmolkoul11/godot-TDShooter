@@ -266,6 +266,8 @@ func _die() -> void:
 		animation_player.play("death")
 
 	await get_tree().create_timer(0.5).timeout
+	PerformanceMetrics.on_enemy_killed("BT")
+
 	queue_free()
 
 

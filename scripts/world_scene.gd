@@ -80,6 +80,7 @@ func _spawn_turtle_box() -> void:
 
 func _on_turtle_picked_up() -> void:
 	print("[World] LEVEL 1 COMPLETE – Turtle rescued!")
+	PerformanceMetrics.on_turtle_picked()
 
 	# Don't double-trigger
 	if _stage2_transition_started or _in_stage2:
@@ -133,6 +134,8 @@ func _start_stage2_transition() -> void:
 
 
 func _enter_stage2() -> void:
+	PerformanceMetrics.on_stage2_started()
+
 	_in_stage2 = true
 	print("Stage 2 started: cleaning Stage 1 enemies, spawning BT enemies + safe zone")
 
@@ -190,6 +193,7 @@ func _spawn_safe_zone() -> void:
 
 func _on_turtle_delivered() -> void:
 	print("[World] LEVEL 2 COMPLETE – Turtle delivered to SafeZone")
+	PerformanceMetrics.on_turtle_delivered()
 
 	if _turtle and _turtle.is_carried:
 		# Drop turtle at safe zone center
@@ -211,6 +215,12 @@ func _on_turtle_delivered() -> void:
 
 func _on_player_died() -> void:
 	print("game over!")
+
+	PerformanceMetrics.on_player_died_event("enemy_contact", (2 if _in_stage2 else 1))
+
+	# Store the current scene path NOW — before the scene unloads
+	var path := get_tree().current_scene.scene_file_path
+
 	get_tree().create_timer(3.0).timeout.connect(func():
-		get_tree().change_scene_to_file(get_tree().current_scene.scene_file_path)
+		get_tree().change_scene_to_file(path)
 	)

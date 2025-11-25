@@ -109,7 +109,14 @@ func _hit(target: Object) -> void:
 				print("[Bullet] Damaging enemy: ", enemy_name)
 			enemy.take_damage(damage, _shooter as Player)
 			_consumed = true
+			
+			var shooter_type := "FSM"
+			if _shooter is EnemyBT: shooter_type = "BT"
+			elif _shooter is ExtendedBTEnemy: shooter_type = "EXT"
+			PerformanceMetrics.on_enemy_bullet_hit_player(shooter_type)
+
 			queue_free()
+			PerformanceMetrics.on_player_bullet_hit_enemy()
 			return
 
 	# === Enemy / EnemyBT / ExtendedBTEnemy bullets hitting player ===
@@ -124,6 +131,13 @@ func _hit(target: Object) -> void:
 			if debug_logs:
 				var player_name: String = player.name
 				print("[Bullet] Damaging player: ", player_name)
+			
+			var shooter_type := "FSM"
+			if _shooter is EnemyBT: shooter_type = "BT"
+			elif _shooter is ExtendedBTEnemy: shooter_type = "EXT"
+
+			PerformanceMetrics.on_enemy_bullet_hit_player(shooter_type)
+
 
 			# Player.take_damage expects CharacterBody2D as 2nd arg
 			if _shooter is Enemy:
