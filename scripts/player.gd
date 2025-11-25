@@ -52,6 +52,9 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	look_at(get_global_mouse_position())
+	
+	if health <= 1:
+		PerformanceMetrics.on_player_low_health(delta)
 
 	if Input.is_action_just_pressed("quit_game"):
 		get_tree().quit()
@@ -98,6 +101,7 @@ func _physics_process(delta: float) -> void:
 			_dash_dir = dir
 			_dash_time_left = dash_duration
 			velocity = _dash_dir * dash_speed
+			PerformanceMetrics.on_dash_used()
 
 	# Dash / normal movement
 	if is_dashing:
@@ -122,6 +126,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _fire_bullet() -> void:
+	PerformanceMetrics.on_player_fired()
 	var bullet: Bullet = BULLET_SCENE.instantiate()
 	var scene_root: Node = get_tree().get_current_scene()
 	var bullets_node: Node = scene_root.get_node_or_null("Bullets")
@@ -209,6 +214,7 @@ func take_damage(amount: int, attacker: CharacterBody2D = null) -> void:
 		return
 
 	health -= amount
+	PerformanceMetrics.on_player_damaged(amount)
 
 	var attacker_name: String = "Unknown"
 	if attacker != null:
