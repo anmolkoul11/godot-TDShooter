@@ -60,7 +60,7 @@ var _actual_dodge_chance: float = 0.0         # Individual enemy's dodge chance 
 
 # === Cover System ===
 var _cover_position: Vector2 = Vector2.ZERO   # Detected cover location
-var _in_cover: bool = false                   # Currently in cover
+var _in_cover: bool = false                   # Currently in cover (logical flag, but textures now use LOS)
 var _peek_fire_timer: float = 0.0             # Timer for peek-fire behavior
 var _retreat_spawn_position: Vector2 = Vector2.ZERO  # Where to retreat to
 
@@ -72,6 +72,7 @@ const MUZZLE_SCENE := preload("res://scenes/muzzle_flash.tscn")
 const TRACER_SCENE := preload("res://scenes/tracer.tscn")
 const ENEMY_SHOOTER_SCRIPT := preload("res://scripts/enemy_shooter.gd")
 
+@onready var sprite: Sprite2D = $Sprite2D
 @onready var animation_player: AnimationPlayer = $AnimationPlayer
 @onready var hurt_sound: AudioStreamPlayer2D = $HurtSound
 @onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
@@ -80,9 +81,17 @@ const ENEMY_SHOOTER_SCRIPT := preload("res://scripts/enemy_shooter.gd")
 
 var squad: SquadCoordinator = null
 
+# === Textures for cover / normal ===
+var _normal_texture: Texture2D
+const COVER_TEXTURE: Texture2D = preload("res://assets/enemyEXTcover.png")
+
 
 func _ready() -> void:
 	randomize()
+
+	# Store whatever texture the enemy had in the scene (enemyEXT.png)
+	if sprite:
+		_normal_texture = sprite.texture
 
 	_wander_center = global_position
 	_retreat_spawn_position = global_position  # Remember spawn location for retreat
@@ -169,6 +178,9 @@ func _physics_process(_delta: float) -> void:
 				_state_taking_cover()
 			EnemyState.RETREATING:
 				_state_retreating()
+
+	# === Texture swap purely based on LOS (enemy behind box) ===
+	_update_cover_texture()
 
 	_move_character()
 	
@@ -288,11 +300,13 @@ func _state_taking_cover() -> void:
 				_try_fire_at_player()
 				_peek_fire_timer = 0.0
 		else:
+			_in_cover = false
 			# Move to cover position
 			var dir = ((_cover_position - global_position).normalized())
 			velocity = velocity.move_toward(dir * speed, acceleration * get_physics_process_delta_time())
 			_face_direction_smooth(dir, get_physics_process_delta_time())
 	else:
+		_in_cover = false
 		# No cover found, return to engage
 		_state = EnemyState.ENGAGE
 
@@ -300,6 +314,8 @@ func _state_taking_cover() -> void:
 func _state_retreating() -> void:
 	if player == null or not is_instance_valid(player):
 		return
+
+	_in_cover = false
 
 	# Head back to spawn location (retreat position)
 	_current_target = _retreat_spawn_position
@@ -364,6 +380,36 @@ func _find_cover() -> void:
 		# No cover found, stay current position
 		_cover_position = global_position
 
+
+# ======================
+#  Texture + cover LOS helpers
+# ======================
+
+func _update_cover_texture() -> void:
+	# "In cover" for visuals = there is a wall/box between enemy and player
+	var behind_cover := _is_behind_cover()
+
+	if behind_cover:
+		if sprite and sprite.texture != COVER_TEXTURE:
+			sprite.texture = COVER_TEXTURE
+	else:
+		if sprite and _normal_texture and sprite.texture != _normal_texture:
+			sprite.texture = _normal_texture
+
+
+func _is_behind_cover() -> bool:
+	if player == null or not is_instance_valid(player):
+		return false
+
+	var space_state := get_world_2d().direct_space_state
+	var query := PhysicsRayQueryParameters2D.create(global_position, player.global_position)
+	query.collision_mask = 9  # same mask you used for walls/boxes in _find_cover()
+	var result := space_state.intersect_ray(query)
+
+	# If we hit something on wall layer 9 between enemy and player, we consider that "taking cover"
+	return not result.is_empty()
+
+
 # ======================
 #  Shooting (with red tracers, faster than Stage 1)
 # ======================
@@ -371,7 +417,13 @@ func _find_cover() -> void:
 func _try_fire_at_player() -> void:
 	if player == null or not is_instance_valid(player):
 		return
+
+	# Do NOT fire if we are behind cover (box/wall blocks LOS to player)
+	if _is_behind_cover():
+		return
+
 	shooter.try_fire_at_target(self, player)
+
 
 
 # ======================
