@@ -61,6 +61,12 @@ func try_fire_at_target(shooter: CharacterBody2D, target: Node2D) -> bool:
 		bullets_node.add_child(bullet)
 	else:
 		scene_root.add_child(bullet)
+	
+	var type := "FSM"
+	if enemy is EnemyBT: type = "BT"
+	elif enemy is ExtendedBTEnemy: type = "EXT"
+
+	PerformanceMetrics.on_enemy_bullet_fired(type)
 
 	bullet.setup(shooter, start, dir)
 

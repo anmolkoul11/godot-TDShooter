@@ -238,6 +238,7 @@ func _state_engage() -> void:
 		
 		# If reached flank, slowly move closer to player
 		if _flank_reached:
+			PerformanceMetrics.on_flank_attempt()
 			_close_in_timer += get_physics_process_delta_time()
 			var close_in_speed = speed * 0.15  # Very slow close-in
 			_current_target = player.global_position.move_toward(flank_pos, close_in_speed * _close_in_timer)
@@ -292,6 +293,7 @@ func _state_taking_cover() -> void:
 		# If reached cover, hunker down
 		if dist_to_cover < stop_distance:
 			_in_cover = true
+			PerformanceMetrics.on_cover_entered()
 			velocity = Vector2.ZERO
 			
 			# Peek-fire behavior
@@ -312,6 +314,8 @@ func _state_taking_cover() -> void:
 
 
 func _state_retreating() -> void:
+	PerformanceMetrics.on_retreat()
+
 	if player == null or not is_instance_valid(player):
 		return
 
@@ -457,6 +461,7 @@ func take_damage(amount: int, attacker: Player) -> void:
 	_try_dodge()
 
 	if hit_points <= 0:
+		PerformanceMetrics.on_enemy_killed("EXT")
 		print(name + " (BT enemy) died")
 		queue_free()
 
@@ -475,7 +480,7 @@ func _try_dodge() -> void:
 		velocity = _dash_dir * dash_speed
 		
 		print(name + " dodged!")
-
+		PerformanceMetrics.on_dodge()
 
 func _check_for_incoming_bullets() -> void:
 	# Get all bullets in the scene
@@ -515,6 +520,8 @@ func _attempt_predictive_dodge() -> void:
 		velocity = _dash_dir * dash_speed
 		
 		print(name + " predicted dodge!")
+		PerformanceMetrics.on_dodge()
+
 
 
 func _on_timer_timeout() -> void:
