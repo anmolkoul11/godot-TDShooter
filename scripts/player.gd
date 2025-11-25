@@ -4,6 +4,7 @@ class_name Player
 signal died
 
 var speed: float = 300.0
+var has_key: bool = false  # Track if player has acquired the key
 
 @export var max_health: int = 4
 

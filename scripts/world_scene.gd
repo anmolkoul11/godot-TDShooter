@@ -6,6 +6,7 @@ const BT_ENEMY_SCENE := preload("res://scenes/enemy_bt_extended.tscn")
 const DEBUG_MANAGER_SCRIPT := preload("res://scripts/debug_manager.gd")
 const TURTLE_BOX_SCENE := preload("res://scenes/turtle_box.tscn")
 const SAFE_ZONE_SCENE := preload("res://scenes/safe_zone.tscn")
+const KEY_SCENE := preload("res://scenes/key.tscn")
 
 # Stage-2 spawn offsets relative to player
 const BT_SPAWN_OFFSETS := [
@@ -33,6 +34,11 @@ var _turtle_box: TurtleBox = null
 var _safe_zone: SafeZone = null
 var _scene_path: String = ""  # Store scene path for reloading
 
+# Cage/Key system
+var _stage1_enemies_alive: int = 0
+var _last_enemy_death_position: Vector2 = Vector2.ZERO
+var _key_spawned: bool = false
+
 
 func _ready() -> void:
 	_scene_path = scene_file_path
@@ -58,16 +64,58 @@ func _ready() -> void:
 			_bt_enemy_scale = e.scale
 			break
 
-	# Spawn special turtle box for Level 1
+	# Count Stage-1 enemies and connect death signals
+	_setup_stage1_enemies()
+
+	# Spawn special turtle box for Level 1 (inside cage)
 	_spawn_turtle_box()
+
+
+func _setup_stage1_enemies() -> void:
+	_stage1_enemies_alive = 0
+	for enemy_name in STAGE1_ENEMY_NAMES:
+		if has_node(enemy_name):
+			var e := get_node(enemy_name)
+			_stage1_enemies_alive += 1
+			
+			# Connect to tree_exiting signal to track death
+			if e and not e.tree_exiting.is_connected(_on_enemy_died):
+				e.tree_exiting.connect(_on_enemy_died.bind(e))
+	
+	print("[World] Stage 1 enemies alive: %d" % _stage1_enemies_alive)
+
+
+func _on_enemy_died(enemy: Node) -> void:
+	if enemy and is_instance_valid(enemy):
+		_last_enemy_death_position = enemy.global_position
+	
+	_stage1_enemies_alive -= 1
+	print("[World] Enemy died. Remaining: %d" % _stage1_enemies_alive)
+	
+	# If all Stage 1 enemies are dead, spawn the key
+	if _stage1_enemies_alive <= 0 and not _key_spawned:
+		_spawn_key()
+
+
+func _spawn_key() -> void:
+	_key_spawned = true
+	
+	var key := KEY_SCENE.instantiate()
+	# Use call_deferred to add child safely after tree_exiting is complete
+	add_child.call_deferred(key)
+	
+	# Spawn at last enemy death position
+	key.global_position = _last_enemy_death_position
+	
+	print("[World] Key spawned at ", key.global_position)
 
 
 func _spawn_turtle_box() -> void:
 	_turtle_box = TURTLE_BOX_SCENE.instantiate()
 	add_child(_turtle_box)
 
-	# Place the crate somewhere in Level 1.
-	_turtle_box.global_position = Vector2(2500, 1400)
+	# Place the crate inside the cage
+	_turtle_box.global_position = Vector2(2600, 700)
 	print("[World] TurtleBox spawned at ", _turtle_box.global_position)
 
 	# Grab the turtle from inside the crate, and hook level-complete logic
@@ -209,8 +257,9 @@ func _on_turtle_delivered() -> void:
 		).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 	# Delay, then restart or move to next scene
+	var scene_path = get_tree().current_scene.scene_file_path
 	get_tree().create_timer(2.0).timeout.connect(func():
-		get_tree().change_scene_to_file(get_tree().current_scene.scene_file_path)
+		get_tree().change_scene_to_file(scene_path)
 	)
 
 func _on_player_died() -> void:
@@ -219,8 +268,7 @@ func _on_player_died() -> void:
 	PerformanceMetrics.on_player_died_event("enemy_contact", (2 if _in_stage2 else 1))
 
 	# Store the current scene path NOW — before the scene unloads
-	var path := get_tree().current_scene.scene_file_path
-
+	var scene_path = get_tree().current_scene.scene_file_path
 	get_tree().create_timer(3.0).timeout.connect(func():
-		get_tree().change_scene_to_file(path)
+		get_tree().change_scene_to_file(scene_path)
 	)
